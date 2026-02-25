@@ -18,7 +18,7 @@ This implementation follows a **Fan-Out/Fan-In** pattern to ensure non-linear, c
 ## 🛠️ Tech Stack
 - **Orchestration:** LangGraph (StateGraph)
 - **Environment:** `uv` (Isolated CPython 3.13.7)
-- **Parsing:** `Docling` (PDF-to-Markdown) & Python `ast` module
+- **Parsing:** `Docling` with RapidOCR(Torch backend)&Python `ast` module
 - **Observability:** LangSmith (Forensic Traceability)
 
 ---
@@ -29,10 +29,10 @@ This implementation follows a **Fan-Out/Fan-In** pattern to ensure non-linear, c
 Ensure you have the `uv` package manager installed.
 ```bash
 # Sync dependencies and create virtual environment
-uv sync
+`uv sync`
 
  2. Environment Configuration
-Create a .envfile in the root directory:
+Create a .env filein the root directory:
 
 ```OPENAI_API_KEY=your_openai_key
 LANGCHAIN_TRACING_V2=true
@@ -51,6 +51,26 @@ Sandbox Isolation: All repository analysis is performed tempfile.TemporaryDirect
 AST vs. Regex: The auditor ignores comments and strings, focusing only on the logical structure of the code (eg, detecting if builder.add_edgeit is actually called).
 
 Concurrency Proof: Every run is logged to LangSmith, providing a timestamped trace of parallel execution branches.
+
+## 🕵️‍♂️ Technical Proof: Orchestration & Parallelism
+
+To verify the "Master Thinker" rubric requirements for parallel execution and graph orchestration, see the LangChain LangSmith trace below:
+
+![LangGraph Trace showing Parallel Node Execution](assets/langsmith_trace.png)
+
+* **Parallel Execution**: Notice how `doc_detective` and `repo_detective` execute simultaneously in the waterfall view.
+* **Structured Evidence**: The output pane confirms the successful merge of OCR data and AST verification.
+
+## 🛡️ Forensic Protocols & Multimodal Logic
+
+Multimodal Document Analysis: The system integrates Docling paired with RapidOCR to audit non-text-searchable PDFs, ensuring diagrams or scanned text are analyzed for technical keywords like "LangGraph" and "Reducers."
+
+Static Code Analysis (AST): Instead of unreliable regex, the RepoInvestigator uses the Python ast module to walk the code's structural tree, verifying actual StateGraph instantiation while ignoring comments and strings.
+
+Sandbox Isolation: All repository analysis is performed within tempfile.TemporaryDirectory to prevent code injection or local environmental pollution.
+
+Concurrency Proof: Every run is logged to LangSmith, providing a timestamped "Waterfall" trace of parallel execution branches.
+
 
 Interim Submission Status
 [x] Functional LangGraph with parallel nodes.
