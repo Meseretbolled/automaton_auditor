@@ -1,0 +1,14 @@
+[project]
+name = "automaton_auditor"
+version = "0.1.0"
+description = "Forensic Swarm for Autonomous Governance"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "langgraph",
+    "langchain-openai",
+    "pydantic",
+    "python-dotenv",
+    "docling",
+    "gitpython",
+]
