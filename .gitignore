@@ -10,3 +10,4 @@ wheels/
 .venv
 .env
 .env
+reports/audit_report.md
