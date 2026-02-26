@@ -1,0 +1,34 @@
+{
+  "criteria": [
+    {
+      "id": "forensic_accuracy",
+      "name": "Forensic Accuracy",
+      "weight": 0.30,
+      "description": "Evidence is objective, verifiable, and cross-referenced (repo + report)."
+    },
+    {
+      "id": "graph_architecture",
+      "name": "LangGraph Architecture",
+      "weight": 0.25,
+      "description": "Correct fan-out/fan-in parallel execution, reducers, robust state handling."
+    },
+    {
+      "id": "judicial_nuance",
+      "name": "Judicial Nuance",
+      "weight": 0.20,
+      "description": "Distinct judge personas, disagreement handling, evidence-grounded debate."
+    },
+    {
+      "id": "ai_usage_judgment",
+      "name": "AI Usage & Judgment",
+      "weight": 0.15,
+      "description": "LLMs used appropriately (reasoning vs facts), structured outputs, no hallucinations."
+    },
+    {
+      "id": "quality_of_execution",
+      "name": "Quality of Execution",
+      "weight": 0.10,
+      "description": "Clean code, clarity, error handling, documentation, runnable end-to-end."
+    }
+  ]
+}
