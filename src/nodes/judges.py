@@ -1,6 +1,5 @@
 import json
 import os
-import re
 import time
 from typing import Dict, List, Tuple
 
@@ -8,10 +7,6 @@ from pydantic import ValidationError
 
 from src.state import AgentState, Evidence, JudicialOpinion, JudgeName
 
-
-# ----------------------------
-# Helpers
-# ----------------------------
 
 def _load_rubric(path: str = "rubric.json") -> List[Dict]:
     if not os.path.exists(path):
@@ -24,7 +19,6 @@ def _load_rubric(path: str = "rubric.json") -> List[Dict]:
 
 
 def _flatten_evidence(evidences: Dict[str, List[Evidence]]) -> List[Tuple[str, Evidence]]:
-    """Return list of (evidence_id, Evidence) where evidence_id is like 'repo_detective:0'."""
     flat: List[Tuple[str, Evidence]] = []
     for source, items in evidences.items():
         for i, ev in enumerate(items):
@@ -33,23 +27,17 @@ def _flatten_evidence(evidences: Dict[str, List[Evidence]]) -> List[Tuple[str, E
 
 
 def _evidence_brief(evidences: Dict[str, List[Evidence]], max_items: int = 10) -> str:
-    """Create a compact text summary of evidence for the judge prompt."""
     flat = _flatten_evidence(evidences)[:max_items]
 
     lines: List[str] = []
     for ev_id, ev in flat:
         status = "FOUND" if ev.found else "FAIL"
-        # Keep it short to reduce token usage
         lines.append(f"- {ev_id} | {status} | {ev.goal} | {ev.location} | {ev.confidence:.2f}")
 
     return "\n".join(lines) if lines else "No evidence provided."
 
 
 def _choose_citations(evidences: Dict[str, List[Evidence]], limit: int = 3) -> List[str]:
-    """
-    Choose evidence IDs to cite. Prefer negative evidence (found=False), then highest confidence.
-    Returns IDs like repo_detective:0 (no brackets).
-    """
     flat = _flatten_evidence(evidences)
 
     negatives = [(eid, ev) for eid, ev in flat if not ev.found]
@@ -66,18 +54,16 @@ def _choose_citations(evidences: Dict[str, List[Evidence]], limit: int = 3) -> L
 
 
 def _extract_json(text: str) -> str:
-    """
-    Extract the first JSON object from text.
-    Robust against extra words before/after JSON.
-    """
     start = text.find("{")
     end = text.rfind("}")
     if start == -1 or end == -1 or end <= start:
         raise ValueError("No JSON object found in model output.")
-    return text[start:end + 1]
+    return text[start : end + 1]
 
 
 def _llm_available() -> bool:
+    if os.getenv("LLM_MODE", "").lower().strip() == "fallback":
+        return False
     return bool(os.getenv("GROQ_API_KEY", "").strip())
 
 
@@ -86,12 +72,10 @@ def _get_llm():
 
     model = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
     temperature = float(os.getenv("JUDGE_TEMPERATURE", "0.2"))
-
     return ChatGroq(model=model, temperature=temperature)
 
 
 def _judge_prompt(judge: JudgeName, criterion: Dict, evidence_text: str) -> str:
-    """Different personas: Prosecutor (strict), Defense (generous), TechLead (practical)."""
     cid = criterion["id"]
     cname = criterion.get("name", cid)
     cdesc = criterion.get("description", "")
@@ -128,7 +112,6 @@ def _judge_prompt(judge: JudgeName, criterion: Dict, evidence_text: str) -> str:
         "- Return ONLY JSON. No markdown, no code fences, no extra text."
     )
 
-    # IMPORTANT: keep JSON braces as plain text, only insert values with {judge} and {cid}
     return f"""
 {persona}
 
@@ -147,40 +130,30 @@ Return ONLY a valid JSON object (no extra text):
 """.strip()
 
 
-def _deterministic_fallback(
+def _deterministic_fallback_for_one(
     judge: JudgeName,
-    criteria: List[Dict],
+    criterion_id: str,
     evidences: Dict[str, List[Evidence]],
-) -> List[JudicialOpinion]:
-    """If no API key, still return structured opinions so the pipeline runs."""
+    reason: str,
+) -> JudicialOpinion:
     total = sum(len(v) for v in evidences.values())
     has_fail = any((not ev.found) for _, ev in _flatten_evidence(evidences))
 
-    base = 3
+    score = 3
     if total == 0:
-        base = 1
+        score = 1
     elif has_fail and judge == "Prosecutor":
-        base = 2
+        score = 2
     elif not has_fail and judge == "Defense":
-        base = 4
+        score = 4
 
-    cites = _choose_citations(evidences, limit=3)
-
-    opinions: List[JudicialOpinion] = []
-    for c in criteria:
-        opinions.append(
-            JudicialOpinion(
-                judge=judge,
-                criterion_id=c["id"],
-                score=base,
-                argument=(
-                    f"(Fallback) Evidence_count={total}, has_failures={has_fail}. "
-                    "Replace with LLM judging for final submission."
-                ),
-                cited_evidence=cites,
-            )
-        )
-    return opinions
+    return JudicialOpinion(
+        judge=judge,
+        criterion_id=criterion_id,
+        score=score,
+        argument=reason,
+        cited_evidence=_choose_citations(evidences, limit=3),
+    )
 
 
 def _run_judge(judge: JudgeName, state: AgentState) -> Dict:
@@ -191,78 +164,63 @@ def _run_judge(judge: JudgeName, state: AgentState) -> Dict:
         raise ValueError("rubric.json loaded but contains no 'criteria'.")
 
     if not _llm_available():
-        opinions = _deterministic_fallback(judge, criteria, evidences)
+        opinions: List[JudicialOpinion] = []
+        for c in criteria:
+            opinions.append(
+                _deterministic_fallback_for_one(
+                    judge=judge,
+                    criterion_id=c["id"],
+                    evidences=evidences,
+                    reason="LLM disabled/unavailable. Used deterministic fallback.",
+                )
+            )
         return {"opinions": opinions}
 
     llm = _get_llm()
+    evidence_text = _evidence_brief(evidences, max_items=int(os.getenv("MAX_EVIDENCE_FOR_JUDGES", "8")))
 
-    evidence_text = _evidence_brief(
-        evidences,
-        max_items=int(os.getenv("MAX_EVIDENCE_FOR_JUDGES", "6")),
-    )
-
-    retries = int(os.getenv("GROQ_RETRIES", "3"))
-    retry_sleep = float(os.getenv("GROQ_RETRY_SLEEP", "6"))
+    try:
+        from groq import RateLimitError, BadRequestError  # type: ignore
+    except Exception:
+        RateLimitError = Exception  # type: ignore
+        BadRequestError = Exception  # type: ignore
 
     opinions: List[JudicialOpinion] = []
 
-    for criterion in criteria:
-        prompt = _judge_prompt(judge, criterion, evidence_text)
-
-        # Retry on rate limit
-        raw = None
-        last_err = None
-
-        for _ in range(retries):
-            try:
-                raw = llm.invoke(prompt)
-                last_err = None
-                break
-            except Exception as e:
-                last_err = e
-                msg = str(e).lower()
-                if "rate limit" in msg or "429" in msg:
-                    time.sleep(retry_sleep)
-                    continue
-                break
-
-        # Still failed -> safe fallback per-criterion (NO CRASH)
-        if raw is None:
-            opinions.append(
-                JudicialOpinion(
-                    judge=judge,
-                    criterion_id=criterion["id"],
-                    score=2,
-                    argument=f"Groq call failed (likely rate limit). Used safe fallback. Error={type(last_err).__name__}",
-                    cited_evidence=_choose_citations(evidences, limit=3),
-                )
-            )
-            continue
-
-        text = getattr(raw, "content", str(raw))
+    for c in criteria:
+        cid = c["id"]
+        prompt = _judge_prompt(judge, c, evidence_text)
 
         try:
+            raw = llm.invoke(prompt)
+            text = getattr(raw, "content", str(raw))
+
             json_str = _extract_json(text)
             data = json.loads(json_str)
 
-            # Normalize citations: remove accidental brackets
-            cited: List[str] = []
+            cited_clean: List[str] = []
             for item in data.get("cited_evidence", []):
-                s = str(item).strip()
-                s = s.replace("[", "").replace("]", "")
-                cited.append(s)
-
-            data["cited_evidence"] = cited
+                s = str(item).strip().replace("[", "").replace("]", "")
+                cited_clean.append(s)
+            data["cited_evidence"] = cited_clean
 
             opinion = JudicialOpinion(**data)
 
-        except (json.JSONDecodeError, ValidationError, ValueError) as e:
-            opinion = JudicialOpinion(
+        except RateLimitError:
+            time.sleep(float(os.getenv("JUDGE_BACKOFF_SECONDS", "6")))
+            opinion = _deterministic_fallback_for_one(
                 judge=judge,
-                criterion_id=criterion["id"],
-                score=2,
-                argument=f"Judge output parsing failed; used safe fallback. Error={type(e).__name__}",
-                cited_evidence=_choose_citations(evidences, limit=3),
+                criterion_id=cid,
+                evidences=evidences,
+                reason="Rate limit hit. Used deterministic fallback for this criterion.",
+            )
+
+        except (BadRequestError, json.JSONDecodeError, ValidationError, ValueError, Exception) as e:
+            opinion = _deterministic_fallback_for_one(
+                judge=judge,
+                criterion_id=cid,
+                evidences=evidences,
+                reason=f"Judge output failed ({type(e).__name__}). Used deterministic fallback.",
             )
 
         if not opinion.cited_evidence:
@@ -272,10 +230,6 @@ def _run_judge(judge: JudgeName, state: AgentState) -> Dict:
 
     return {"opinions": opinions}
 
-
-# ----------------------------
-# LangGraph Nodes
-# ----------------------------
 
 def prosecutor_judge(state: AgentState):
     return _run_judge("Prosecutor", state)

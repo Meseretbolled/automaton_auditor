@@ -5,10 +5,6 @@ import subprocess
 from typing import Dict, Any, List
 
 
-# =========================================================
-# 1️⃣ SANDBOXED REPO CLONE
-# =========================================================
-
 def clone_repo_sandboxed(repo_url: str):
     """
     Clones a repository into a temporary directory sandbox.
@@ -32,10 +28,6 @@ def clone_repo_sandboxed(repo_url: str):
         print(f"[ERROR] Git clone failed: {e.stderr}")
         return None, None
 
-
-# =========================================================
-# 2️⃣ GIT HISTORY EXTRACTION
-# =========================================================
 
 def extract_git_history(repo_path: str) -> List[Dict[str, str]]:
     """
@@ -66,10 +58,6 @@ def extract_git_history(repo_path: str) -> List[Dict[str, str]]:
         print(f"[ERROR] Git log failed: {e.stderr}")
         return []
 
-
-# =========================================================
-# 3️⃣ AST HELPERS
-# =========================================================
 
 def _has_typed_state(state_py: str) -> bool:
     """
@@ -148,11 +136,6 @@ def _detect_unsafe_calls(repo_path: str) -> List[str]:
                     continue
 
     return flagged_files
-
-
-# =========================================================
-# 4️⃣ FORENSIC VERIFICATION ENTRYPOINT
-# =========================================================
 
 def verify_graph_forensics(repo_path: str) -> Dict[str, Any]:
     """

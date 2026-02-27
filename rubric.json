@@ -3,32 +3,27 @@
     {
       "id": "forensic_accuracy",
       "name": "Forensic Accuracy",
-      "weight": 0.30,
-      "description": "Evidence is objective, verifiable, and cross-referenced (repo + report)."
+      "description": "Evidence is grounded, cross-references repo + report, avoids hallucination, and cites sources clearly."
     },
     {
       "id": "graph_architecture",
-      "name": "LangGraph Architecture",
-      "weight": 0.25,
-      "description": "Correct fan-out/fan-in parallel execution, reducers, robust state handling."
+      "name": "Graph Architecture",
+      "description": "Clear LangGraph fan-out/fan-in structure, reducers, typed state, and correct orchestration."
     },
     {
       "id": "judicial_nuance",
       "name": "Judicial Nuance",
-      "weight": 0.20,
-      "description": "Distinct judge personas, disagreement handling, evidence-grounded debate."
+      "description": "Distinct judge personas, evidence-grounded disagreement, and a clear synthesis process."
     },
     {
       "id": "ai_usage_judgment",
       "name": "AI Usage & Judgment",
-      "weight": 0.15,
-      "description": "LLMs used appropriately (reasoning vs facts), structured outputs, no hallucinations."
+      "description": "Uses LLMs correctly for judgment, structured output, and separates reasoning from facts."
     },
     {
       "id": "quality_of_execution",
       "name": "Quality of Execution",
-      "weight": 0.10,
-      "description": "Clean code, clarity, error handling, documentation, runnable end-to-end."
+      "description": "Runnable, readable, secure, and production-quality patterns (errors handled, no unsafe calls)."
     }
   ]
 }
