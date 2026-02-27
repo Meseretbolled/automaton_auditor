@@ -28,27 +28,23 @@ The Automaton Auditor follows a Fan-Out / Fan-In Swarm Pattern with typed state 
 ```mermaid
 flowchart TD
 
-    START([START]) --> R[RepoInvestigator 🔎]
-    START --> D[DocAnalyst 📘]
+START([START]) --> R[RepoInvestigator]
+START --> D[DocAnalyst]
 
-    R --> AGG[Evidence Aggregator<br/>Reducer: operator.ior]
-    D --> AGG
+R --> AGG[Evidence Aggregator - Reducer: operator.ior]
+D --> AGG
 
-    AGG --> P[Prosecutor ⚖️]
-    P --> DEF[Defense 🛡️]
-    DEF --> T[TechLead 👨‍💻]
+AGG --> P[Prosecutor]
+P --> DEF[Defense]
+DEF --> T[TechLead]
 
-    T --> CJ[Chief Justice 👑]
-    CJ --> REPORT[Final Audit Report 📊]
-
-    🧩 Layered Architecture View
+T --> CJ[Chief Justice]
+CJ --> REPORT[Final Audit Report]
 
 
 ---
 
 # 📌 2️⃣ Layered Architecture View
-
-Paste this under a new section:
 
 ```markdown
 ## 🧠 Layered Architecture View
@@ -56,33 +52,31 @@ Paste this under a new section:
 ```mermaid
 flowchart LR
 
-subgraph Layer 1: Forensic Detectives (Parallel)
-    R[RepoInvestigator<br/>• AST Analysis<br/>• Graph Verification<br/>• Reducer Detection]
-    D[DocAnalyst<br/>• OCR Processing<br/>• Semantic Chunking<br/>• Concept Verification]
+subgraph Layer1_Detectives
+R[RepoInvestigator]
+D[DocAnalyst]
 end
 
-subgraph Layer 2: Typed Swarm State
-    S[AgentState<br/>evidences: Dict[str, List[Evidence]]<br/>Reducer: operator.ior]
+subgraph Layer2_State
+S[AgentState with Reducer]
 end
 
-subgraph Layer 3: Judicial Evaluation
-    P[Prosecutor]
-    DEF[Defense]
-    T[TechLead]
+subgraph Layer3_Judges
+P[Prosecutor]
+DEF[Defense]
+T[TechLead]
 end
 
-subgraph Layer 4: Deterministic Synthesis
-    CJ[Chief Justice<br/>Score Aggregation<br/>Variance Detection<br/>Remediation]
-    FR[AuditReport Output]
+subgraph Layer4_Synthesis
+CJ[Chief Justice]
+FR[AuditReport]
 end
 
 R --> S
 D --> S
-
 S --> P
 P --> DEF
 DEF --> T
-
 T --> CJ
 CJ --> FR
 
@@ -103,14 +97,9 @@ Paste this too:
 ```mermaid
 flowchart TD
 
-    E1[Repo Evidence Stream]
-    E2[Doc Evidence Stream]
-
-    E1 --> RED[operator.ior Reducer]
-    E2 --> RED
-
-    RED --> MERGED[Merged Evidence Dictionary]
-
+E1[Repo Evidence] --> RED[operator.ior Reducer]
+E2[Doc Evidence] --> RED
+RED --> MERGED[Merged Evidence State]
 
     
     Why this matters:
