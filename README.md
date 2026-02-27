@@ -1,323 +1,258 @@
-🕵️ The Automaton Auditor — Week 2 Forensic Swarm
-📌 Project Overview
+# 🕵️ Automaton Auditor  
+### A Multi-Agent Forensic Swarm for Auditing Autonomous Systems
 
-The Automaton Auditor is a multi-agent forensic auditing system built with LangGraph.
-It evaluates autonomous agent repositories using structured evidence, static analysis (AST), document analysis (OCR + semantic chunking), and a multi-judge reasoning layer.
+The **Automaton Auditor** is a structured multi-agent system built with **LangGraph**.  
+It performs deep forensic audits of autonomous repositories by combining:
 
-Instead of simple keyword matching, the system performs:
+- Static code analysis (AST verification)
+- Multimodal document inspection (OCR + semantic chunking)
+- Structured judicial reasoning (LLM-backed debate)
+- Deterministic score synthesis
 
-📂 Static Code Verification (AST-based)
+The system follows a **Fan-Out / Fan-In Swarm Architecture** with typed state reducers to ensure safe parallel execution.
 
-📄 Multimodal PDF Analysis (OCR + semantic chunking)
+---
 
-⚖️ Multi-Persona Judicial Evaluation
+# 📌 Project Overview
 
-🧠 Deterministic Final Synthesis
+Unlike simple text analysis tools, Automaton Auditor verifies:
 
-The result is a structured, explainable audit report grounded in real repository and documentation evidence.
+- Actual `StateGraph` instantiation
+- Reducer usage for safe concurrency
+- Parallel fan-out / fan-in wiring
+- Theoretical alignment between repository and documentation
+- Structured AI reasoning vs factual verification
 
+The system is designed to meet the **Robust Swarm Architecture Rubric** requirements.
 
-🧠 System Architecture
+---
 
-The Automaton Auditor follows a Fan-Out / Fan-In Swarm Pattern with typed state merging and structured judicial evaluation.
-
-🔁 High-Level Swarm Flow
+# 🏗 System Architecture
 
 ## 🔁 High-Level Execution Flow
 
-```mermaid
-flowchart TD
+![High Level Flow](assets/architecture-flow.png)
 
-START([START]) --> R[RepoInvestigator]
-START --> D[DocAnalyst]
+Execution Model:
 
-R --> AGG[Evidence Aggregator - Reducer: operator.ior]
-D --> AGG
-
-AGG --> P[Prosecutor]
-P --> DEF[Defense]
-DEF --> T[TechLead]
-
-T --> CJ[Chief Justice]
-CJ --> REPORT[Final Audit Report]
-
+1. Detectives run in parallel  
+2. Evidence streams merge via typed reducer  
+3. Three judicial personas evaluate independently  
+4. Chief Justice synthesizes scores deterministically  
+5. Final structured audit report is generated  
 
 ---
 
-# 📌 2️⃣ Layered Architecture View
-
-```markdown
 ## 🧠 Layered Architecture View
 
-```mermaid
-flowchart LR
+![Layered Architecture](assets/layered-architecture.png)
 
-subgraph Layer1_Detectives
-R[RepoInvestigator]
-D[DocAnalyst]
-end
+### Layer 1 — Forensic Detectives (Parallel)
+- **RepoInvestigator**
+  - Python AST analysis
+  - Graph structure verification
+  - Reducer detection
+- **DocAnalyst**
+  - RapidOCR processing
+  - Semantic chunking
+  - Concept verification
 
-subgraph Layer2_State
-S[AgentState with Reducer]
-end
+### Layer 2 — Typed Swarm State
+- `AgentState`
+- Evidence dictionary
+- `operator.ior` reducer for safe merging
 
-subgraph Layer3_Judges
-P[Prosecutor]
-DEF[Defense]
-T[TechLead]
-end
+### Layer 3 — Judicial Evaluation
+- Prosecutor (strict)
+- Defense (balanced)
+- TechLead (engineering-focused)
 
-subgraph Layer4_Synthesis
-CJ[Chief Justice]
-FR[AuditReport]
-end
-
-R --> S
-D --> S
-S --> P
-P --> DEF
-DEF --> T
-T --> CJ
-CJ --> FR
-
-🔄 Reducer-Based Evidence Merge (Core Concept)
-
-
-This shows evaluators your architecture thinking level 🔥
+### Layer 4 — Deterministic Synthesis
+- Chief Justice score aggregation
+- Variance detection
+- Remediation suggestions
+- Final structured JSON report
 
 ---
 
-# 📌 3️⃣ Evidence Reducer Mechanism Diagram
-
-Paste this too:
-
-```markdown
 ## 🔄 Evidence Reducer Mechanism
 
-```mermaid
-flowchart TD
+![Reducer Mechanism](assets/reducer-diagram.png)
 
-E1[Repo Evidence] --> RED[operator.ior Reducer]
-E2[Doc Evidence] --> RED
-RED --> MERGED[Merged Evidence State]
+Parallel evidence is merged using `operator.ior` to prevent:
 
-    
-    Why this matters:
+- State overwrite
+- Evidence loss
+- Concurrency race conditions
 
-Prevents overwriting during parallel execution
+This guarantees deterministic fan-in behavior.
 
-Guarantees deterministic fan-in
+---
 
-Preserves evidence provenance
+# ⚖ Judicial Layer
 
-Ensures structured state integrity
+Each criterion is evaluated by three distinct personas:
 
-🔎 Forensic Layer (Parallel Detectives)
-🔹 RepoInvestigator
+| Judge | Role |
+|-------|------|
+| Prosecutor | Strict, skeptical, penalizes gaps |
+| Defense | Fair, credits partial implementation |
+| TechLead | Engineering-focused, values architecture |
 
-Uses Python ast module for structural analysis
-
-Verifies:
-
-StateGraph instantiation
-
-builder.add_edge() wiring
-
-Parallel structure
-
-Reducer usage (operator.ior)
-
-Ignores comments and string literals
-
-Outputs structured Evidence objects
-
-🔹 DocAnalyst
-
-Uses RapidOCR + semantic chunking
-
-Audits PDF reports (including scanned content)
-
-Detects theoretical alignment:
-
-LangGraph
-
-Parallelism
-
-Reducers
-
-Swarm architecture
-
-Assigns confidence scores
-
-Outputs structured evidence
-
-Both detectives execute in parallel and merge their outputs via typed reducers.
-
-⚖️ Judicial Layer (Multi-Agent Reasoning)
-
-After evidence collection, three independent judges evaluate rubric criteria.
-
-⚖️ Prosecutor
-
-Strict and skeptical
-
-Penalizes missing requirements
-
-Flags inconsistencies
-
-🛡️ Defense
-
-Fair and balanced
-
-Rewards partial implementations
-
-Recognizes architectural intent
-
-👨‍💻 TechLead
-
-Engineering-focused
-
-Evaluates correctness and maintainability
-
-Checks architectural soundness
-
-Each judge:
-
-Uses Groq (Llama 3.1)
-
-Produces structured JudicialOpinion
-
-Must cite real evidence IDs (e.g., repo_detective:0)
-
-Includes rate-limit safe retry logic
-
-Falls back safely if JSON parsing fails
-
-👑 Chief Justice (Deterministic Synthesis)
+All judges return structured outputs validated by Pydantic.
 
 The Chief Justice:
+- Computes average score
+- Detects variance (disagreement)
+- Generates remediation guidance
 
-Aggregates all judicial opinions
+---
 
-Computes final per-criterion score
-
-Detects disagreement (variance)
-
-Produces:
-
-Final score
-
-Strengths
-
-Weaknesses
-
-Remediation recommendations
-
-Dissent flag (if judges disagree)
-
-Final output is a structured AuditReport.
-
-## 🛠️ Tech Stack
+# 🛠 Tech Stack
 
 | Layer | Technology |
 |-------|------------|
 | Orchestration | LangGraph (StateGraph) |
 | LLM | Groq (Llama 3.1-8b-instant) |
 | Static Analysis | Python `ast` module |
-| Document Processing | RapidOCR (via Docling) |
-| State Modeling | Pydantic (Typed AgentState + Reducers) |
+| OCR | RapidOCR |
+| State Modeling | Pydantic |
+| Environment | uv (Python 3.13 isolated env) |
 | Observability | LangSmith |
-| Environment | uv (Isolated Python 3.13) |
 
-🚀 Getting Started
-1️⃣ Installation
+---
 
-```uv sync```
+# 🚀 Getting Started
 
-2️⃣ Environment Configuration
+## 1️⃣ Install Dependencies
 
-Create a .env file in the root directory:
+```bash
+uv sync
+ ```
+Activate environment:
 
-GROQ_API_KEY=your_groq_key
-GROQ_MODEL=llama-3.1-8b-instant
+```source .venv/bin/activate```
 
-LANGCHAIN_TRACING_V2=true
-LANGCHAIN_API_KEY=your_langsmith_key
-LANGCHAIN_PROJECT=automaton-auditor-week2
+2️⃣ Configure Environment
 
-3️⃣ Running the Audit
+Create a ```.env``` file in the project root:
 
-uv run python -m src.main
+```GROQ_API_KEY=your_groq_key
+   GROQ_MODEL=llama-3.1-8b-instant 
+   LANGCHAIN_TRACING_V2=true
+   LANGCHAIN_API_KEY=your_langsmith_key
+   LANGCHAIN_PROJECT=automaton-auditor-week2```
+
+---
+
+3️⃣ Run the Auditor
+
+```python -m src.main```
 
 The system will:
 
-Ingest and chunk the PDF
+Clone & sandbox target repository
 
-Analyze repository structure via AST
+Process PDF report
 
-Execute three judicial personas
+Run parallel detectives
 
-Synthesize final audit report
+Execute judicial reasoning
 
-Output structured scoring
+Output structured final audit JSON
 
-🛡️ Forensic Protocols
-🔐 Sandboxed Repository Inspection
+🛡 Forensic Protocols
 
-Cloning and inspection occur in isolated temporary directories.
+Sandboxed Repository Analysis
 
-🧩 AST over Regex
+All repository inspection runs inside temporary directories to prevent:
 
-Structural verification is performed using Python’s ast, ensuring real execution logic is analyzed.
+Code injection
 
-📄 Multimodal PDF Analysis
+Local environment pollution
 
-RapidOCR allows analysis of scanned or non-searchable PDFs.
+Unsafe execution
 
-⚖️ Evidence-Grounded Judging
+AST-Based Verification
 
-Judges are explicitly instructed to:
+The RepoInvestigator:
 
-Use only provided evidence
+Ignores comments and strings
 
-Avoid hallucination
+Inspects real code structure
 
-Cite valid evidence IDs
+Detects actual graph wiring
 
-🧠 Deterministic Final Aggregation
+Multimodal PDF Inspection
 
-Final scoring logic is reproducible and transparent.
+DocAnalyst:
 
-📊 Current Swarm Status
+Extracts text via RapidOCR
 
-✅ Functional parallel forensic layer
-✅ Typed state with reducer-based merging (operator.ior)
-✅ AST-based graph verification
-✅ OCR-based document analysis
-✅ Three-judge reasoning layer
-✅ Deterministic chief justice synthesis
-✅ Groq integration with rate-limit safety
-✅ Structured final audit report generation
+Performs semantic chunk search
 
-🎯 Rubric Alignment
+Verifies theoretical claims
 
-This implementation demonstrates:
+Structured LLM Outputs
 
-Fan-Out/Fan-In architecture
+Judges:
 
-Parallel execution proof
+Return strict JSON
 
-Reducer-based state merging
+Are validated via Pydantic
 
-Structured evidence handling
+Fall back safely if parsing fails
 
-Multi-agent reasoning
+📊 Example Output
+```
+{
+  "overall_score": 3,
+  "criteria": [
+    {
+      "criterion_id": "graph_architecture",
+      "final_score": 3,
+      "summary": "Chief Justice synthesis.",
+      "remediation": [
+        "Tighten reducer verification evidence."
+      ]
+    }
+  ]
+}```
 
-Deterministic final synthesis
+📈 Current Swarm Status
 
-🧭 Project Phase
+ Parallel LangGraph execution
 
-Swarm Level: Full Judicial Stack Active
+ Typed AgentState with reducers
 
-Detectives + Judges + Chief Justice operational.
-Next phase focuses on strengthening evidence grounding and improving scoring robustness
+ AST-based graph verification
+
+ Multimodal PDF chunk inspection
+
+ Structured judicial layer
+
+ Deterministic score synthesis
+
+
+🧠 Design Philosophy
+
+The Automaton Auditor separates:
+
+Fact verification (AST, OCR)
+
+Reasoning (LLM judges)
+
+Deterministic scoring (Chief Justice)
+
+This prevents hallucination from contaminating structural validation.
+
+📜 License
+
+MIT License
+
+
+👩‍💻 Author
+
+Meseret Bolled
+Software Engineering Student
+Focused on AI-native system architecture & multi-agent design
