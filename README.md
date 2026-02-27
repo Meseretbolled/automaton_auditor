@@ -137,11 +137,11 @@ Activate environment:
 
 Create a ```.env``` file in the project root:
 
-```GROQ_API_KEY=your_groq_key
-   GROQ_MODEL=llama-3.1-8b-instant 
-   LANGCHAIN_TRACING_V2=true
-   LANGCHAIN_API_KEY=your_langsmith_key
-   LANGCHAIN_PROJECT=automaton-auditor-week2```
+```GROQ_API_KEY=your_groq_key```
+```GROQ_MODEL=llama-3.1-8b-instant```
+```LANGCHAIN_TRACING_V2=true```
+```LANGCHAIN_API_KEY=your_langsmith_key```
+```LANGCHAIN_PROJECT=automaton-auditor-week2```
 
 ---
 
@@ -149,43 +149,47 @@ Create a ```.env``` file in the project root:
 
 ```python -m src.main```
 
-The system will:
+---
 
-Clone & sandbox target repository
+## The system will:
 
-Process PDF report
+- Clone & sandbox target repository
 
-Run parallel detectives
+- Process PDF report
 
-Execute judicial reasoning
+- Run parallel detectives
 
-Output structured final audit JSON
+- Execute judicial reasoning
 
-🛡 Forensic Protocols
+- Output structured final audit JSON
+  
+---
 
-Sandboxed Repository Analysis
+## 🛡 Forensic Protocols
 
-All repository inspection runs inside temporary directories to prevent:
+- Sandboxed Repository Analysis
 
-Code injection
+- All repository inspection runs inside temporary directories to prevent:
 
-Local environment pollution
+- Code injection
 
-Unsafe execution
+- Local environment pollution
 
-AST-Based Verification
+- Unsafe execution
 
-The RepoInvestigator:
+- AST-Based Verification
 
-Ignores comments and strings
+** The RepoInvestigator:**
 
-Inspects real code structure
+- Ignores comments and strings
 
-Detects actual graph wiring
+- Inspects real code structure
 
-Multimodal PDF Inspection
+- Detects actual graph wiring
 
-DocAnalyst:
+- Multimodal PDF Inspection
+
+## DocAnalyst:
 
 Extracts text via RapidOCR
 
@@ -195,7 +199,7 @@ Verifies theoretical claims
 
 Structured LLM Outputs
 
-Judges:
+## Judges:
 
 Return strict JSON
 
@@ -203,8 +207,9 @@ Are validated via Pydantic
 
 Fall back safely if parsing fails
 
-📊 Example Output
-```
+## 📊 Example Output
+
+```json
 {
   "overall_score": 3,
   "criteria": [
@@ -217,13 +222,14 @@ Fall back safely if parsing fails
       ]
     }
   ]
-}```
+}`
 
-📈 Current Swarm Status
+```
+## 📈 Current Swarm Status
 
- Parallel LangGraph execution
+ - Parallel LangGraph execution
 
- Typed AgentState with reducers
+- Typed AgentState with reducers
 
  AST-based graph verification
 
@@ -234,25 +240,24 @@ Fall back safely if parsing fails
  Deterministic score synthesis
 
 
-🧠 Design Philosophy
+## 🧠 Design Philosophy
 
-The Automaton Auditor separates:
+- The Automaton Auditor separates:
 
-Fact verification (AST, OCR)
+- Fact verification (AST, OCR)
 
-Reasoning (LLM judges)
+- Reasoning (LLM judges)
 
-Deterministic scoring (Chief Justice)
+- Deterministic scoring (Chief Justice)
 
-This prevents hallucination from contaminating structural validation.
+  This prevents hallucination from contaminating structural validation.
 
-📜 License
+
+## 📜 License
 
 MIT License
 
 
-👩‍💻 Author
-
-Meseret Bolled
-Software Engineering Student
-Focused on AI-native system architecture & multi-agent design
+## 👩‍💻 Author - *** Meseret Bolled**
+- Software Engineering Student
+- Focused on AI-native system architecture & multi-agent design
