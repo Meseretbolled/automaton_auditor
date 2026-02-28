@@ -1,21 +1,26 @@
 import json
 import os
 import time
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any
 
 from pydantic import ValidationError
 
 from src.state import AgentState, Evidence, JudicialOpinion, JudgeName
 
 
-def _load_rubric(path: str = "rubric.json") -> List[Dict]:
+def _load_rubric(path: str = "rubric.json") -> List[Dict[str, Any]]:
     if not os.path.exists(path):
         raise FileNotFoundError(
             f"Missing {path}. Create it in the repo root (same level as src/)."
         )
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
-    return data.get("criteria", [])
+
+    # ✅ support both formats
+    dims = data.get("dimensions") or data.get("criteria") or []
+    if not isinstance(dims, list):
+        return []
+    return dims
 
 
 def _flatten_evidence(evidences: Dict[str, List[Evidence]]) -> List[Tuple[str, Evidence]]:
@@ -28,12 +33,11 @@ def _flatten_evidence(evidences: Dict[str, List[Evidence]]) -> List[Tuple[str, E
 
 def _evidence_brief(evidences: Dict[str, List[Evidence]], max_items: int = 10) -> str:
     flat = _flatten_evidence(evidences)[:max_items]
-
     lines: List[str] = []
     for ev_id, ev in flat:
         status = "FOUND" if ev.found else "FAIL"
-        lines.append(f"- {ev_id} | {status} | {ev.goal} | {ev.location} | {ev.confidence:.2f}")
-
+        conf = float(ev.confidence or 0.0)
+        lines.append(f"- {ev_id} | {status} | {ev.goal} | {ev.location} | {conf:.2f}")
     return "\n".join(lines) if lines else "No evidence provided."
 
 
@@ -43,22 +47,14 @@ def _choose_citations(evidences: Dict[str, List[Evidence]], limit: int = 3) -> L
     negatives = [(eid, ev) for eid, ev in flat if not ev.found]
     positives = [(eid, ev) for eid, ev in flat if ev.found]
 
-    negatives.sort(key=lambda x: x[1].confidence, reverse=True)
-    positives.sort(key=lambda x: x[1].confidence, reverse=True)
+    negatives.sort(key=lambda x: float(x[1].confidence or 0.0), reverse=True)
+    positives.sort(key=lambda x: float(x[1].confidence or 0.0), reverse=True)
 
     chosen = [eid for eid, _ in negatives[:limit]]
     if len(chosen) < limit:
         chosen += [eid for eid, _ in positives[: (limit - len(chosen))]]
 
     return chosen
-
-
-def _extract_json(text: str) -> str:
-    start = text.find("{")
-    end = text.rfind("}")
-    if start == -1 or end == -1 or end <= start:
-        raise ValueError("No JSON object found in model output.")
-    return text[start : end + 1]
 
 
 def _llm_available() -> bool:
@@ -75,10 +71,14 @@ def _get_llm():
     return ChatGroq(model=model, temperature=temperature)
 
 
-def _judge_prompt(judge: JudgeName, criterion: Dict, evidence_text: str) -> str:
-    cid = criterion["id"]
+def _judge_prompt(judge: JudgeName, criterion: Dict[str, Any], evidence_text: str) -> str:
+    cid = criterion.get("id", "unknown")
     cname = criterion.get("name", cid)
-    cdesc = criterion.get("description", "")
+
+    # doc rubric uses forensic_instruction and judicial_logic
+    instr = criterion.get("forensic_instruction") or criterion.get("description") or ""
+    logic = (criterion.get("judicial_logic") or {})
+    judge_logic = logic.get(judge.lower()) or logic.get(judge) or ""
 
     persona = {
         "Prosecutor": (
@@ -108,8 +108,8 @@ def _judge_prompt(judge: JudgeName, criterion: Dict, evidence_text: str) -> str:
         "Rules:\n"
         "- Use ONLY the evidence provided.\n"
         "- Do NOT invent files or facts.\n"
-        "- cited_evidence must be IDs like repo_detective:0 or doc_detective:2 (NO brackets).\n"
-        "- Return ONLY JSON. No markdown, no code fences, no extra text."
+        "- cited_evidence must be IDs like repo_detective:0 or doc_detective:2\n"
+        "- Provide a short argument (2–5 sentences).\n"
     )
 
     return f"""
@@ -118,15 +118,24 @@ def _judge_prompt(judge: JudgeName, criterion: Dict, evidence_text: str) -> str:
 Criterion:
 - id: {cid}
 - name: {cname}
-- description: {cdesc}
+
+Forensic instruction:
+{instr}
+
+Judge-specific logic to apply:
+{judge_logic}
 
 Evidence (subset):
 {evidence_text}
 
 {scoring_rules}
 
-Return ONLY a valid JSON object (no extra text):
-{{"judge":"{judge}","criterion_id":"{cid}","score":1,"argument":"...","cited_evidence":["repo_detective:0"]}}
+Return a JudicialOpinion with:
+- judge = "{judge}"
+- criterion_id = "{cid}"
+- score = integer 1..5
+- argument = your reasoning grounded in evidence
+- cited_evidence = list of evidence IDs (e.g. ["repo_detective:0"])
 """.strip()
 
 
@@ -156,12 +165,14 @@ def _deterministic_fallback_for_one(
     )
 
 
-def _run_judge(judge: JudgeName, state: AgentState) -> Dict:
-    evidences = state.get("evidences", {})
+def _run_judge(judge: JudgeName, state: AgentState) -> Dict[str, Any]:
+    time.sleep(float(os.getenv("JUDGE_PER_CRITERION_DELAY", "1.5")))
+
+    evidences = state.get("evidences", {}) or {}
     criteria = _load_rubric()
 
     if not criteria:
-        raise ValueError("rubric.json loaded but contains no 'criteria'.")
+        raise ValueError("rubric.json loaded but contains no dimensions/criteria.")
 
     if not _llm_available():
         opinions: List[JudicialOpinion] = []
@@ -169,15 +180,19 @@ def _run_judge(judge: JudgeName, state: AgentState) -> Dict:
             opinions.append(
                 _deterministic_fallback_for_one(
                     judge=judge,
-                    criterion_id=c["id"],
+                    criterion_id=c.get("id", "unknown"),
                     evidences=evidences,
                     reason="LLM disabled/unavailable. Used deterministic fallback.",
                 )
             )
         return {"opinions": opinions}
 
-    llm = _get_llm()
-    evidence_text = _evidence_brief(evidences, max_items=int(os.getenv("MAX_EVIDENCE_FOR_JUDGES", "8")))
+    base_llm = _get_llm()
+    structured_llm = base_llm.with_structured_output(JudicialOpinion)
+
+    evidence_text = _evidence_brief(
+        evidences, max_items=int(os.getenv("MAX_EVIDENCE_FOR_JUDGES", "5"))
+    )
 
     try:
         from groq import RateLimitError, BadRequestError  # type: ignore
@@ -188,23 +203,13 @@ def _run_judge(judge: JudgeName, state: AgentState) -> Dict:
     opinions: List[JudicialOpinion] = []
 
     for c in criteria:
-        cid = c["id"]
+        cid = c.get("id", "unknown")
         prompt = _judge_prompt(judge, c, evidence_text)
 
         try:
-            raw = llm.invoke(prompt)
-            text = getattr(raw, "content", str(raw))
-
-            json_str = _extract_json(text)
-            data = json.loads(json_str)
-
-            cited_clean: List[str] = []
-            for item in data.get("cited_evidence", []):
-                s = str(item).strip().replace("[", "").replace("]", "")
-                cited_clean.append(s)
-            data["cited_evidence"] = cited_clean
-
-            opinion = JudicialOpinion(**data)
+            opinion = structured_llm.invoke(prompt)
+            opinion.judge = judge
+            opinion.criterion_id = cid
 
         except RateLimitError:
             time.sleep(float(os.getenv("JUDGE_BACKOFF_SECONDS", "6")))
@@ -215,7 +220,7 @@ def _run_judge(judge: JudgeName, state: AgentState) -> Dict:
                 reason="Rate limit hit. Used deterministic fallback for this criterion.",
             )
 
-        except (BadRequestError, json.JSONDecodeError, ValidationError, ValueError, Exception) as e:
+        except (BadRequestError, ValidationError, ValueError, Exception) as e:
             opinion = _deterministic_fallback_for_one(
                 judge=judge,
                 criterion_id=cid,

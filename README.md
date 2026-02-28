@@ -231,11 +231,11 @@ Fall back safely if parsing fails
 
 - Typed AgentState with reducers
 
- AST-based graph verification
+- AST-based graph verification
 
- Multimodal PDF chunk inspection
+- Multimodal PDF chunk inspection
 
- Structured judicial layer
+- Structured judicial layer
 
  Deterministic score synthesis
 
@@ -258,6 +258,6 @@ Fall back safely if parsing fails
 MIT License
 
 
-## 👩‍💻 Author - *** Meseret Bolled**
+## 👩‍💻 Author - ** Meseret Bolled**
 - Software Engineering Student
 - Focused on AI-native system architecture & multi-agent design
