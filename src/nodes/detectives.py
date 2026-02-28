@@ -7,11 +7,6 @@ from src.state import AgentState, Evidence
 from src.tools.repo_tools import clone_repo_sandboxed, verify_graph_forensics
 from src.tools.doc_tools import PDFForensicInterface
 
-
-# ----------------------------
-# Small helpers (judge-friendly)
-# ----------------------------
-
 def _clip(text: Optional[str], n: int = 240) -> Optional[str]:
     """Keep snippets short to avoid token bloat."""
     if not text:
@@ -33,10 +28,6 @@ def _best_per_concept(findings: List[Dict]) -> List[Dict]:
     return list(best.values())
 
 
-# ----------------------------
-# Detectives
-# ----------------------------
-
 def repo_investigator(state: AgentState):
     path, temp_dir = clone_repo_sandboxed(state["repo_url"])
 
@@ -57,7 +48,7 @@ def repo_investigator(state: AgentState):
     try:
         all_evidence: List[Evidence] = []
 
-        # ✅ If verify_graph_forensics crashes, THAT is a failure
+        # If verify_graph_forensics crashes, THAT is a failure
         try:
             results = verify_graph_forensics(path)
         except Exception as e:
@@ -160,9 +151,6 @@ def repo_investigator(state: AgentState):
             )
         all_evidence.append(security_evidence)
 
-        # ✅ IMPORTANT FIX:
-        # Repo detective ran successfully -> repo_failed must be False
-        # Even if verified=False, that's just "evidence found=False", not a failure.
         return {
             "evidences": {"repo_detective": all_evidence},
             "repo_failed": False,

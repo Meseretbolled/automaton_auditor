@@ -7,10 +7,6 @@ from src.nodes.detectives import repo_investigator, doc_analyst, vision_inspecto
 from src.nodes.judges import prosecutor_judge, defense_judge, techlead_judge
 from src.nodes.justice import chief_justice
 
-
-# -----------------------------
-# Fan-in nodes (explicit)
-# -----------------------------
 def evidence_aggregator(state: AgentState):
     """
     Explicit fan-in node for detective evidence.
@@ -26,11 +22,6 @@ def opinion_aggregator(state: AgentState):
     Reducers in AgentState already merge opinion fields, so this node can be a no-op.
     """
     return {}
-
-
-# -----------------------------
-# Conditional routing helpers
-# -----------------------------
 def _has_failure_flag(state: AgentState, flag_names: tuple[str, ...]) -> bool:
     """
     Safely checks failure flags on the state.

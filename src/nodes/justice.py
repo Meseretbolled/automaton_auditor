@@ -87,10 +87,6 @@ def _compute_overall(results: List[CriterionResult], weights: Dict[str, float]) 
     return max(1, min(5, overall))
 
 
-# ----------------------------
-# FIXED: strict security confirmation
-# ----------------------------
-
 def _security_flaw_confirmed(evidences: Dict[str, List[Evidence]]) -> bool:
     """
     Confirm ONLY when repo evidence explicitly says unsafe execution was DETECTED in code.

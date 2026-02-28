@@ -1,29 +1,34 @@
 # 🕵️ Automaton Auditor  
-### A Multi-Agent Forensic Swarm for Auditing Autonomous Systems
-
-The **Automaton Auditor** is a structured multi-agent system built with **LangGraph**.  
-It performs deep forensic audits of autonomous repositories by combining:
-
-- Static code analysis (AST verification)
-- Multimodal document inspection (OCR + semantic chunking)
-- Structured judicial reasoning (LLM-backed debate)
-- Deterministic score synthesis
-
-The system follows a **Fan-Out / Fan-In Swarm Architecture** with typed state reducers to ensure safe parallel execution.
+### A Deterministic Multi-Agent Forensic Swarm for Auditing Autonomous Systems
 
 ---
 
-# 📌 Project Overview
+## 📌 Overview
 
-Unlike simple text analysis tools, Automaton Auditor verifies:
+**Automaton Auditor** is a structured multi-agent forensic system built using **LangGraph**.  
+It performs deep architectural audits of autonomous repositories by combining:
 
-- Actual `StateGraph` instantiation
-- Reducer usage for safe concurrency
-- Parallel fan-out / fan-in wiring
-- Theoretical alignment between repository and documentation
-- Structured AI reasoning vs factual verification
+- 🔎 AST-based static code verification  
+- 📄 Multimodal PDF forensic analysis (OCR + semantic chunking)  
+- ⚖ Structured judicial LLM debate  
+- 🧠 Deterministic score synthesis  
 
-The system is designed to meet the **Robust Swarm Architecture Rubric** requirements.
+The system follows a **Fan-Out / Fan-In Swarm Architecture** with typed reducers to ensure safe parallel execution and deterministic evidence merging.
+
+---
+
+## 🎯 Project Purpose
+
+This project was designed to satisfy a **Robust Swarm Architecture Rubric**, requiring:
+
+- True parallel orchestration
+- Typed state with reducers
+- Evidence-grounded reasoning
+- Structured judicial outputs
+- Deterministic synthesis
+- Separation of fact verification from LLM reasoning
+
+Unlike simple LLM-based audit tools, Automaton Auditor verifies *real structural implementation* using Python AST inspection.
 
 ---
 
@@ -33,45 +38,82 @@ The system is designed to meet the **Robust Swarm Architecture Rubric** requirem
 
 ![High Level Flow](assets/architecture-flow.png)
 
-Execution Model:
+**Execution Model:**
 
 1. Detectives run in parallel  
 2. Evidence streams merge via typed reducer  
 3. Three judicial personas evaluate independently  
-4. Chief Justice synthesizes scores deterministically  
+4. Chief Justice synthesizes deterministically  
 5. Final structured audit report is generated  
+
+This fan-out / fan-in architecture guarantees concurrency safety and deterministic results.
 
 ---
 
-## 🧠 Layered Architecture View
+## 🧠 Layered Architecture
 
 ![Layered Architecture](assets/layered-architecture.png)
 
-### Layer 1 — Forensic Detectives (Parallel)
-- **RepoInvestigator**
-  - Python AST analysis
-  - Graph structure verification
-  - Reducer detection
-- **DocAnalyst**
-  - RapidOCR processing
-  - Semantic chunking
-  - Concept verification
+### 🟢 Layer 1 — Forensic Detectives (Parallel)
 
-### Layer 2 — Typed Swarm State
-- `AgentState`
-- Evidence dictionary
-- `operator.ior` reducer for safe merging
+#### 🔍 RepoInvestigator
+- Sandboxed repository cloning
+- AST graph verification
+- Reducer detection
+- Git progression analysis
+- Security scan (`os.system`, `shell=True` detection)
 
-### Layer 3 — Judicial Evaluation
-- Prosecutor (strict)
-- Defense (balanced)
-- TechLead (engineering-focused)
+#### 📄 DocAnalyst
+- RapidOCR ingestion
+- Semantic chunk search
+- Rubric concept verification
+- File-path cross-reference (hallucination detection)
 
-### Layer 4 — Deterministic Synthesis
-- Chief Justice score aggregation
-- Variance detection
-- Remediation suggestions
-- Final structured JSON report
+#### 🖼 VisionInspector
+- Embedded PDF diagram detection
+- Repository image scanning
+- Optional dimension extraction (Pillow)
+
+---
+
+### 🔵 Layer 2 — Typed Swarm State
+
+- `AgentState` defined via Pydantic
+- Evidence stored as structured `Evidence` objects
+- `operator.ior` reducer ensures safe merging
+- Prevents evidence overwrite and race conditions
+
+---
+
+### 🟠 Layer 3 — Judicial Evaluation
+
+Three independent personas evaluate each criterion:
+
+| Judge        | Personality |
+|--------------|-------------|
+| **Prosecutor** | Strict, skeptical, penalizes missing proof |
+| **Defense**    | Balanced, credits partial implementations |
+| **TechLead**   | Engineering-focused, values architecture correctness |
+
+Each judge:
+- Uses Groq (Llama 3.1-8b-instant)
+- Returns structured JSON
+- Is validated via Pydantic
+- Falls back safely if LLM parsing fails
+
+---
+
+### 🔴 Layer 4 — Chief Justice Synthesis Engine
+
+The Chief Justice:
+
+- Computes average score
+- Detects disagreement variance
+- Applies fact-supremacy penalties
+- Generates remediation guidance
+- Produces deterministic final JSON report
+
+This prevents LLM hallucination from overriding factual verification.
 
 ---
 
@@ -81,34 +123,15 @@ Execution Model:
 
 Parallel evidence is merged using `operator.ior` to prevent:
 
-- State overwrite
-- Evidence loss
-- Concurrency race conditions
+- State overwrite  
+- Evidence loss  
+- Concurrency race conditions  
 
 This guarantees deterministic fan-in behavior.
 
 ---
 
-# ⚖ Judicial Layer
-
-Each criterion is evaluated by three distinct personas:
-
-| Judge | Role |
-|-------|------|
-| Prosecutor | Strict, skeptical, penalizes gaps |
-| Defense | Fair, credits partial implementation |
-| TechLead | Engineering-focused, values architecture |
-
-All judges return structured outputs validated by Pydantic.
-
-The Chief Justice:
-- Computes average score
-- Detects variance (disagreement)
-- Generates remediation guidance
-
----
-
-# 🛠 Tech Stack
+# 🛠 Technology Stack
 
 | Layer | Technology |
 |-------|------------|
@@ -117,104 +140,95 @@ The Chief Justice:
 | Static Analysis | Python `ast` module |
 | OCR | RapidOCR |
 | State Modeling | Pydantic |
-| Environment | uv (Python 3.13 isolated env) |
+| Image Processing | PyMuPDF + Pillow (optional) |
+| Environment | uv (Python 3.13 isolated environment) |
 | Observability | LangSmith |
 
 ---
 
-# 🚀 Getting Started
+# 🛡 Security & Forensic Protocols
+
+## 🔒 Sandboxed Repository Analysis
+
+All repository inspection runs inside temporary directories to prevent:
+
+- Code injection
+- Local environment pollution
+- Unsafe execution
+
+The system avoids:
+- `os.system`
+- `shell=True`
+- Unsanitized subprocess calls
+
+---
+
+## 🧬 AST-Based Verification
+
+The RepoInvestigator:
+
+- Ignores comments and strings
+- Inspects real code structure
+- Verifies actual `StateGraph` instantiation
+- Detects reducer usage
+- Identifies unsafe execution patterns
+
+---
+
+## 🧠 Fact Supremacy Protocol
+
+If:
+- Graph structure is missing
+- Reducers are absent
+- Evidence contradicts claims  
+
+The Chief Justice penalizes the score regardless of LLM reasoning.
+
+This ensures structural validation remains authoritative.
+
+---
+
+# 🚀 Installation & Usage
 
 ## 1️⃣ Install Dependencies
 
-```bash
-uv sync
- ```
-Activate environment:
 
-```source .venv/bin/activate```
+```uv sync```
+```source .venv/bin/activate ```
+----
 
-2️⃣ Configure Environment
+## 2️⃣ Configure Environment
 
-Create a ```.env``` file in the project root:
-
+## Create a .env file in the project root:
 ```GROQ_API_KEY=your_groq_key```
 ```GROQ_MODEL=llama-3.1-8b-instant```
+
 ```LANGCHAIN_TRACING_V2=true```
 ```LANGCHAIN_API_KEY=your_langsmith_key```
 ```LANGCHAIN_PROJECT=automaton-auditor-week2```
 
----
+### 3️⃣ Run the Auditor
+- Self Audit
+```python -m src.main \```
+```--repo https://github.com/your/repo.git \```
+```--pdf path/to/report.pdf \```
+```  --mode self```
 
-3️⃣ Run the Auditor
+- Peer Audit
 
-```python -m src.main```
-
----
-
-## The system will:
-
-- Clone & sandbox target repository
-
-- Process PDF report
-
-- Run parallel detectives
-
-- Execute judicial reasoning
-
-- Output structured final audit JSON
-  
----
-
-## 🛡 Forensic Protocols
-
-- Sandboxed Repository Analysis
-
-- All repository inspection runs inside temporary directories to prevent:
-
-- Code injection
-
-- Local environment pollution
-
-- Unsafe execution
-
-- AST-Based Verification
-
-** The RepoInvestigator:**
-
-- Ignores comments and strings
-
-- Inspects real code structure
-
-- Detects actual graph wiring
-
-- Multimodal PDF Inspection
-
-## DocAnalyst:
-
-Extracts text via RapidOCR
-
-Performs semantic chunk search
-
-Verifies theoretical claims
-
-Structured LLM Outputs
-
-## Judges:
-
-Return strict JSON
-
-Are validated via Pydantic
-
-Fall back safely if parsing fails
+```python -m src.main \```
+```--repo https://github.com/peer/repo.git \```
+```--pdf path/to/peer_report.pdf \```
+```--mode peer```
 
 ## 📊 Example Output
-
 ```json
 {
   "overall_score": 3,
+  "executive_summary": "Final audit complete.",
   "criteria": [
     {
-      "criterion_id": "graph_architecture",
+      "criterion_id": "langgraph_architecture",
       "final_score": 3,
       "summary": "Chief Justice synthesis.",
       "remediation": [
@@ -222,42 +236,66 @@ Fall back safely if parsing fails
       ]
     }
   ]
-}`
-
+}
 ```
-## 📈 Current Swarm Status
 
- - Parallel LangGraph execution
+## Reports are saved to:
 
-- Typed AgentState with reducers
+```audit/report_onself_generated/```
+### 📈 Current Capabilities
 
-- AST-based graph verification
+✅ Parallel LangGraph execution
 
-- Multimodal PDF chunk inspection
+✅ Typed AgentState with reducers
 
-- Structured judicial layer
+✅ AST-based graph verification
 
- Deterministic score synthesis
+✅ Git forensic analysis
 
+✅ Security scanning
+
+✅ Multimodal PDF chunk inspection
+
+✅ Hallucination detection
+
+✅ Structured judicial layer
+
+✅ Deterministic score synthesis
+
+✅ LangSmith observability
+
+## 📊 Observability
+
+- All executions are traceable in LangSmith, including:
+
+- Node-level timing
+
+- Token usage
+
+- Judge outputs
+
+- Reducer merges
+
+- Failure paths
 
 ## 🧠 Design Philosophy
 
-- The Automaton Auditor separates:
+- Automaton Auditor strictly separates:
 
-- Fact verification (AST, OCR)
+- Fact Layer (AST + OCR + repository scanning)
 
-- Reasoning (LLM judges)
+- Reasoning Layer (LLM judges)
 
-- Deterministic scoring (Chief Justice)
+- Deterministic Layer (Chief Justice scoring)
 
-  This prevents hallucination from contaminating structural validation.
+- This architecture prevents hallucination from contaminating structural verification.
 
+### 📜 License
 
-## 📜 License
+## MIT License
 
-MIT License
+## 👩‍💻 Author
 
-
-## 👩‍💻 Author - ** Meseret Bolled**
-- Software Engineering Student
-- Focused on AI-native system architecture & multi-agent design
+## Meseret Bolled
+Software Engineering Student
+Focused on AI-native system architecture & multi-agent design

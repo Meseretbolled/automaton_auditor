@@ -10,7 +10,6 @@ from src.state import AgentState, Evidence, JudicialOpinion, JudgeName
 
 
 def _repo_root() -> Path:
-    # rubric.json expected at repo root (same level as src/)
     # This works even if you run from another directory.
     return Path(__file__).resolve().parents[2]
 
@@ -25,7 +24,7 @@ def _load_rubric(path: str = "rubric.json") -> List[Dict[str, Any]]:
     with open(rubric_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    # ✅ support both formats
+    # support both formats
     dims = data.get("dimensions") or data.get("criteria") or []
     return dims if isinstance(dims, list) else []
 
@@ -65,10 +64,6 @@ def _choose_citations(evidences: Dict[str, List[Evidence]], limit: int = 3) -> L
 
     return chosen
 
-
-# ----------------------------
-# AUTO LLM + AUTO FALLBACK
-# ----------------------------
 
 def _llm_available() -> bool:
     """
@@ -219,7 +214,7 @@ def _run_judge(judge: JudgeName, state: AgentState) -> Dict[str, Any]:
 
     opinions: List[JudicialOpinion] = []
 
-    # ✅ Auto-fallback if rate limiting keeps happening
+    # auto-fallback if rate limiting keeps happening
     rate_limit_count = 0
     rate_limit_max = int(os.getenv("RATE_LIMIT_MAX", "2"))
 
@@ -280,5 +275,4 @@ def defense_judge(state: AgentState):
 
 
 def techlead_judge(state: AgentState):
-    # ✅ FIX: no trailing comma (no tuple!)
     return _run_judge("TechLead", state)

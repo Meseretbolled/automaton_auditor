@@ -153,7 +153,7 @@ def main():
     final_report = result.get("final_report")
 
     if not final_report:
-        print("\n⚠️ No final_report produced. Check graph wiring.\n")
+        print("\n No final_report produced. Check graph wiring.\n")
         return
 
     print("\n✅ FINAL REPORT\n")
@@ -163,7 +163,7 @@ def main():
         print(json.dumps(_safe_dump(final_report), indent=2, ensure_ascii=False))
 
     out_dir = write_audit_outputs(final_report, mode=args.mode)
-    print(f"\n✅ Saved audit outputs to: {out_dir}\n")
+    print(f"\n Saved audit outputs to: {out_dir}\n")
 
 
 if __name__ == "__main__":
