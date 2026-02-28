@@ -1,6 +1,7 @@
 import json
 import os
 import time
+from pathlib import Path
 from typing import Dict, List, Tuple, Any
 
 from pydantic import ValidationError
@@ -8,25 +9,31 @@ from pydantic import ValidationError
 from src.state import AgentState, Evidence, JudicialOpinion, JudgeName
 
 
+def _repo_root() -> Path:
+    # rubric.json expected at repo root (same level as src/)
+    # This works even if you run from another directory.
+    return Path(__file__).resolve().parents[2]
+
+
 def _load_rubric(path: str = "rubric.json") -> List[Dict[str, Any]]:
-    if not os.path.exists(path):
+    rubric_path = _repo_root() / path
+    if not rubric_path.exists():
         raise FileNotFoundError(
-            f"Missing {path}. Create it in the repo root (same level as src/)."
+            f"Missing {rubric_path}. Create rubric.json in the repo root (same level as src/)."
         )
-    with open(path, "r", encoding="utf-8") as f:
+
+    with open(rubric_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
     # ✅ support both formats
     dims = data.get("dimensions") or data.get("criteria") or []
-    if not isinstance(dims, list):
-        return []
-    return dims
+    return dims if isinstance(dims, list) else []
 
 
 def _flatten_evidence(evidences: Dict[str, List[Evidence]]) -> List[Tuple[str, Evidence]]:
     flat: List[Tuple[str, Evidence]] = []
-    for source, items in evidences.items():
-        for i, ev in enumerate(items):
+    for source, items in (evidences or {}).items():
+        for i, ev in enumerate(items or []):
             flat.append((f"{source}:{i}", ev))
     return flat
 
@@ -37,7 +44,9 @@ def _evidence_brief(evidences: Dict[str, List[Evidence]], max_items: int = 10) -
     for ev_id, ev in flat:
         status = "FOUND" if ev.found else "FAIL"
         conf = float(ev.confidence or 0.0)
-        lines.append(f"- {ev_id} | {status} | {ev.goal} | {ev.location} | {conf:.2f}")
+        goal = (ev.goal or "")[:80]
+        loc = (ev.location or "")[:80]
+        lines.append(f"- {ev_id} | {status} | {goal} | {loc} | {conf:.2f}")
     return "\n".join(lines) if lines else "No evidence provided."
 
 
@@ -57,8 +66,18 @@ def _choose_citations(evidences: Dict[str, List[Evidence]], limit: int = 3) -> L
     return chosen
 
 
+# ----------------------------
+# AUTO LLM + AUTO FALLBACK
+# ----------------------------
+
 def _llm_available() -> bool:
-    if os.getenv("LLM_MODE", "").lower().strip() == "fallback":
+    """
+    Auto-mode:
+    - If GROQ_API_KEY exists -> use LLM.
+    - If user explicitly sets LLM_MODE=fallback -> force fallback.
+    """
+    mode = os.getenv("LLM_MODE", "").lower().strip()
+    if mode == "fallback":
         return False
     return bool(os.getenv("GROQ_API_KEY", "").strip())
 
@@ -75,41 +94,38 @@ def _judge_prompt(judge: JudgeName, criterion: Dict[str, Any], evidence_text: st
     cid = criterion.get("id", "unknown")
     cname = criterion.get("name", cid)
 
-    # doc rubric uses forensic_instruction and judicial_logic
     instr = criterion.get("forensic_instruction") or criterion.get("description") or ""
-    logic = (criterion.get("judicial_logic") or {})
+    logic = criterion.get("judicial_logic") or {}
     judge_logic = logic.get(judge.lower()) or logic.get(judge) or ""
 
     persona = {
         "Prosecutor": (
             "You are the Prosecutor. Be skeptical and strict. "
-            "Assume corners were cut unless evidence proves otherwise. "
-            "Penalize missing requirements, security issues, and vague claims."
+            "Penalize missing requirements, security issues, vague or unverified claims."
         ),
         "Defense": (
             "You are the Defense. Be fair and generous. "
-            "Give credit for partial implementations and clear intent. "
-            "If evidence is incomplete, suggest what would complete it."
+            "Give credit for partial implementations and strong intent. "
+            "If something is missing, explain exactly what to add."
         ),
         "TechLead": (
             "You are the Tech Lead. Be practical and engineering-focused. "
-            "Prioritize correctness, maintainability, and system design. "
-            "Reward clean architecture and strong evidence."
+            "Prioritize correctness, maintainability, safety, and reproducibility."
         ),
     }[judge]
 
-    scoring_rules = (
-        "Score from 1 to 5:\n"
+    rules = (
+        "Scoring: integer 1..5\n"
         "1 = fails/no evidence\n"
         "2 = weak / major gaps\n"
         "3 = acceptable / partial\n"
         "4 = strong\n"
-        "5 = excellent / exemplary\n\n"
-        "Rules:\n"
-        "- Use ONLY the evidence provided.\n"
-        "- Do NOT invent files or facts.\n"
+        "5 = excellent\n\n"
+        "Hard rules:\n"
+        "- Use ONLY evidence provided.\n"
+        "- Do NOT invent files, APIs, or features.\n"
         "- cited_evidence must be IDs like repo_detective:0 or doc_detective:2\n"
-        "- Provide a short argument (2–5 sentences).\n"
+        "- argument must be short (2–5 sentences) and grounded.\n"
     )
 
     return f"""
@@ -122,20 +138,20 @@ Criterion:
 Forensic instruction:
 {instr}
 
-Judge-specific logic to apply:
+Judge-specific logic:
 {judge_logic}
 
 Evidence (subset):
 {evidence_text}
 
-{scoring_rules}
+{rules}
 
-Return a JudicialOpinion with:
-- judge = "{judge}"
-- criterion_id = "{cid}"
-- score = integer 1..5
-- argument = your reasoning grounded in evidence
-- cited_evidence = list of evidence IDs (e.g. ["repo_detective:0"])
+Return a JudicialOpinion JSON with:
+judge="{judge}"
+criterion_id="{cid}"
+score=1..5
+argument="..."
+cited_evidence=[...]
 """.strip()
 
 
@@ -145,7 +161,7 @@ def _deterministic_fallback_for_one(
     evidences: Dict[str, List[Evidence]],
     reason: str,
 ) -> JudicialOpinion:
-    total = sum(len(v) for v in evidences.values())
+    total = sum(len(v or []) for v in (evidences or {}).values())
     has_fail = any((not ev.found) for _, ev in _flatten_evidence(evidences))
 
     score = 3
@@ -166,7 +182,7 @@ def _deterministic_fallback_for_one(
 
 
 def _run_judge(judge: JudgeName, state: AgentState) -> Dict[str, Any]:
-    time.sleep(float(os.getenv("JUDGE_PER_CRITERION_DELAY", "1.5")))
+    time.sleep(float(os.getenv("JUDGE_PER_CRITERION_DELAY", "1.0")))
 
     evidences = state.get("evidences", {}) or {}
     criteria = _load_rubric()
@@ -174,6 +190,7 @@ def _run_judge(judge: JudgeName, state: AgentState) -> Dict[str, Any]:
     if not criteria:
         raise ValueError("rubric.json loaded but contains no dimensions/criteria.")
 
+    # If LLM is not available (no key or forced fallback), deterministic mode
     if not _llm_available():
         opinions: List[JudicialOpinion] = []
         for c in criteria:
@@ -191,7 +208,7 @@ def _run_judge(judge: JudgeName, state: AgentState) -> Dict[str, Any]:
     structured_llm = base_llm.with_structured_output(JudicialOpinion)
 
     evidence_text = _evidence_brief(
-        evidences, max_items=int(os.getenv("MAX_EVIDENCE_FOR_JUDGES", "5"))
+        evidences, max_items=int(os.getenv("MAX_EVIDENCE_FOR_JUDGES", "6"))
     )
 
     try:
@@ -202,8 +219,25 @@ def _run_judge(judge: JudgeName, state: AgentState) -> Dict[str, Any]:
 
     opinions: List[JudicialOpinion] = []
 
+    # ✅ Auto-fallback if rate limiting keeps happening
+    rate_limit_count = 0
+    rate_limit_max = int(os.getenv("RATE_LIMIT_MAX", "2"))
+
     for c in criteria:
         cid = c.get("id", "unknown")
+
+        # If we already hit too many rate limits, fallback for remaining criteria
+        if rate_limit_count >= rate_limit_max:
+            opinions.append(
+                _deterministic_fallback_for_one(
+                    judge=judge,
+                    criterion_id=cid,
+                    evidences=evidences,
+                    reason="Too many rate limits. Auto-fallback for remaining criteria.",
+                )
+            )
+            continue
+
         prompt = _judge_prompt(judge, c, evidence_text)
 
         try:
@@ -212,7 +246,8 @@ def _run_judge(judge: JudgeName, state: AgentState) -> Dict[str, Any]:
             opinion.criterion_id = cid
 
         except RateLimitError:
-            time.sleep(float(os.getenv("JUDGE_BACKOFF_SECONDS", "6")))
+            rate_limit_count += 1
+            time.sleep(float(os.getenv("JUDGE_BACKOFF_SECONDS", "12")))
             opinion = _deterministic_fallback_for_one(
                 judge=judge,
                 criterion_id=cid,
@@ -245,4 +280,5 @@ def defense_judge(state: AgentState):
 
 
 def techlead_judge(state: AgentState):
+    # ✅ FIX: no trailing comma (no tuple!)
     return _run_judge("TechLead", state)

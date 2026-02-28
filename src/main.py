@@ -11,34 +11,24 @@ from src.graph import graph
 
 
 def _ensure_dirs() -> None:
-    """Create required audit folders if missing."""
     Path("audit/report_onself_generated").mkdir(parents=True, exist_ok=True)
     Path("audit/report_onpeer_generated").mkdir(parents=True, exist_ok=True)
     Path("audit/report_bypeer_received").mkdir(parents=True, exist_ok=True)
 
 
 def _report_dir_for_mode(mode: str) -> Path:
-    if mode == "peer":
-        return Path("audit/report_onpeer_generated")
-    return Path("audit/report_onself_generated")
+    return Path("audit/report_onpeer_generated") if mode == "peer" else Path("audit/report_onself_generated")
 
 
 def _safe_dump(obj: Any) -> Dict[str, Any]:
-    """
-    Convert Pydantic models (or nested ones) to plain dict safely.
-    """
     if hasattr(obj, "model_dump"):
         return obj.model_dump()
     if isinstance(obj, dict):
         return obj
-    # last resort
     return {"value": str(obj)}
 
 
 def _to_markdown(report_dict: Dict[str, Any]) -> str:
-    """
-    Simple, grader-friendly markdown formatter.
-    """
     overall = report_dict.get("overall_score", "N/A")
     summary = report_dict.get("executive_summary", "")
     key_risks = report_dict.get("key_risks", []) or []
@@ -46,13 +36,14 @@ def _to_markdown(report_dict: Dict[str, Any]) -> str:
     criteria = report_dict.get("criteria", []) or []
 
     lines = []
-    lines.append("# Automaton Auditor — Audit Report\n")
-    lines.append(f"**Overall Score:** {overall}/5\n")
-    if summary:
-        lines.append("## Executive Summary\n")
-        lines.append(f"{summary}\n")
+    lines.append("# Automaton Auditor — Audit Report\n\n")
+    lines.append(f"**Overall Score:** {overall}/5\n\n")
 
-    lines.append("## Criteria Results\n")
+    if summary:
+        lines.append("## Executive Summary\n\n")
+        lines.append(f"{summary}\n\n")
+
+    lines.append("## Criteria Results\n\n")
     if not criteria:
         lines.append("- No criteria results found.\n")
     else:
@@ -65,39 +56,39 @@ def _to_markdown(report_dict: Dict[str, Any]) -> str:
             remediation = c.get("remediation", []) or []
             dissent = c.get("dissent")
 
-            lines.append(f"### {cid}\n")
+            lines.append(f"### {cid}\n\n")
             lines.append(f"- **Score:** {score}/5\n")
             if csum:
                 lines.append(f"- **Summary:** {csum}\n")
 
             if strengths:
-                lines.append("- **Strengths:**\n")
+                lines.append("\n**Strengths**\n")
                 for s in strengths[:8]:
-                    lines.append(f"  - {s}\n")
+                    lines.append(f"- {s}\n")
 
             if weaknesses:
-                lines.append("- **Weaknesses:**\n")
+                lines.append("\n**Weaknesses**\n")
                 for w in weaknesses[:8]:
-                    lines.append(f"  - {w}\n")
+                    lines.append(f"- {w}\n")
 
             if remediation:
-                lines.append("- **Remediation:**\n")
+                lines.append("\n**Remediation**\n")
                 for r in remediation[:8]:
-                    lines.append(f"  - {r}\n")
+                    lines.append(f"- {r}\n")
 
             if dissent:
-                lines.append(f"- **Dissent:** {dissent}\n")
+                lines.append(f"\n**Dissent:** {dissent}\n")
 
             lines.append("\n")
 
-    lines.append("## Key Risks\n")
+    lines.append("## Key Risks\n\n")
     if key_risks:
         for r in key_risks[:10]:
             lines.append(f"- {r}\n")
     else:
         lines.append("- None reported.\n")
 
-    lines.append("\n## Next Steps\n")
+    lines.append("\n## Next Steps\n\n")
     if next_steps:
         for n in next_steps[:10]:
             lines.append(f"- {n}\n")
@@ -108,10 +99,6 @@ def _to_markdown(report_dict: Dict[str, Any]) -> str:
 
 
 def write_audit_outputs(final_report_obj: Any, mode: str) -> Path:
-    """
-    Save JSON + MD into the correct audit folder.
-    Returns output directory path.
-    """
     _ensure_dirs()
     out_dir = _report_dir_for_mode(mode)
 
@@ -126,9 +113,8 @@ def write_audit_outputs(final_report_obj: Any, mode: str) -> Path:
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(report_dict, f, indent=2, ensure_ascii=False)
 
-    md_text = _to_markdown(report_dict)
     with open(md_path, "w", encoding="utf-8") as f:
-        f.write(md_text)
+        f.write(_to_markdown(report_dict))
 
     return out_dir
 
@@ -147,13 +133,11 @@ def main():
     )
     args = parser.parse_args()
 
-    # Prefer CLI, fallback to env
     repo_url = (args.repo or os.getenv("REPO_URL", "")).strip()
     pdf_path = (args.pdf or os.getenv("PDF_PATH", "")).strip()
 
     if not repo_url:
         raise ValueError("Missing repo URL. Provide --repo or set REPO_URL in your .env")
-
     if not pdf_path:
         raise ValueError("Missing PDF path. Provide --pdf or set PDF_PATH in your .env")
 
@@ -166,23 +150,20 @@ def main():
     }
 
     result = graph.invoke(initial_state)
-
-    # ✅ Your graph stores final_report at top-level (state key).
     final_report = result.get("final_report")
 
-    if final_report:
-        print("\n✅ FINAL REPORT\n")
-        # print to terminal
-        if hasattr(final_report, "model_dump_json"):
-            print(final_report.model_dump_json(indent=2))
-        else:
-            print(json.dumps(_safe_dump(final_report), indent=2, ensure_ascii=False))
-
-        # save to disk
-        out_dir = write_audit_outputs(final_report, mode=args.mode)
-        print(f"\n✅ Saved audit outputs to: {out_dir}\n")
-    else:
+    if not final_report:
         print("\n⚠️ No final_report produced. Check graph wiring.\n")
+        return
+
+    print("\n✅ FINAL REPORT\n")
+    if hasattr(final_report, "model_dump_json"):
+        print(final_report.model_dump_json(indent=2))
+    else:
+        print(json.dumps(_safe_dump(final_report), indent=2, ensure_ascii=False))
+
+    out_dir = write_audit_outputs(final_report, mode=args.mode)
+    print(f"\n✅ Saved audit outputs to: {out_dir}\n")
 
 
 if __name__ == "__main__":

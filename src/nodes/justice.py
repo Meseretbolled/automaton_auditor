@@ -1,14 +1,20 @@
 import json
-import os
+from pathlib import Path
 from typing import Dict, List, Tuple, Any, Optional
 
 from src.state import AgentState, AuditReport, CriterionResult, JudicialOpinion, Evidence
 
 
+def _repo_root() -> Path:
+    # repo root = same level as src/
+    return Path(__file__).resolve().parents[2]
+
+
 def _load_rubric_file(path: str = "rubric.json") -> Dict[str, Any]:
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"Missing {path}. Create it in repo root.")
-    with open(path, "r", encoding="utf-8") as f:
+    rubric_path = _repo_root() / path
+    if not rubric_path.exists():
+        raise FileNotFoundError(f"Missing {rubric_path}. Create rubric.json in repo root.")
+    with open(rubric_path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -23,20 +29,21 @@ def _load_synthesis_rules(data: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _weight_map(dimensions: List[Dict[str, Any]]) -> Dict[str, float]:
-    return {d.get("id", ""): float(d.get("weight", 0.0)) for d in dimensions}
+    # rubric.json may not contain weights -> fallback to average in _compute_overall
+    return {d.get("id", ""): float(d.get("weight", 0.0) or 0.0) for d in dimensions}
 
 
 def _group_opinions(opinions: List[JudicialOpinion]) -> Dict[str, List[JudicialOpinion]]:
     grouped: Dict[str, List[JudicialOpinion]] = {}
-    for op in opinions:
+    for op in opinions or []:
         grouped.setdefault(op.criterion_id, []).append(op)
     return grouped
 
 
 def _flatten_evidence(evidences: Dict[str, List[Evidence]]) -> List[Tuple[str, Evidence]]:
     flat: List[Tuple[str, Evidence]] = []
-    for source, items in evidences.items():
-        for i, ev in enumerate(items):
+    for source, items in (evidences or {}).items():
+        for i, ev in enumerate(items or []):
             flat.append((f"{source}:{i}", ev))
     return flat
 
@@ -54,6 +61,7 @@ def _final_score_from_opinions(ops: List[JudicialOpinion]) -> Tuple[int, str]:
     base = int(round(avg))
     var = _variance(scores)
 
+    # mild skepticism boost if big disagreement and prosecutor very low
     judges = {o.judge: o for o in ops}
     prosecutor = judges.get("Prosecutor")
     if prosecutor and int(prosecutor.score) <= 2 and var >= 2:
@@ -79,22 +87,43 @@ def _compute_overall(results: List[CriterionResult], weights: Dict[str, float]) 
     return max(1, min(5, overall))
 
 
+# ----------------------------
+# FIXED: strict security confirmation
+# ----------------------------
+
 def _security_flaw_confirmed(evidences: Dict[str, List[Evidence]]) -> bool:
     """
-    Only treat it as a confirmed security flaw if an evidence item explicitly says unsafe calls were found.
-    (This prevents false positives where the string 'shell=True' appears only in documentation text.)
+    Confirm ONLY when repo evidence explicitly says unsafe execution was DETECTED in code.
+    Avoid triggering on documentation strings like 'no shell=True'.
     """
     for _, ev in _flatten_evidence(evidences):
         goal = (ev.goal or "").lower()
-        txt = (ev.content or "").lower()
-        if "security" in goal and "unsafe" in goal and bool(ev.found):
-            return True
-        # also accept an explicit unsafe-files list style content
-        if "unsafe" in goal and bool(ev.found):
-            return True
-        if "unsafe" in txt and bool(ev.found):
+        if ev.found and "security scan" in goal and "unsafe execution detected" in goal:
             return True
     return False
+
+
+def _fact_supremacy_penalty(criterion_id: str, evidences: Dict[str, List[Evidence]]) -> Optional[str]:
+    """
+    Implements 'fact_supremacy': if evidence FACTS show failure, override generous opinions.
+    Returns a short penalty reason if applicable.
+    """
+    flat = _flatten_evidence(evidences)
+
+    # Confirm unsafe only if the dedicated "unsafe execution detected" evidence exists
+    if criterion_id in ("security_sandboxing", "forensic_accuracy_code"):
+        for _, ev in flat:
+            if ev.found and "unsafe execution detected" in (ev.goal or "").lower():
+                return "Fact supremacy: unsafe execution evidence confirmed."
+
+    # If graph/state evidence explicitly failed, cap the criterion
+    if criterion_id in ("langgraph_architecture", "forensic_accuracy_code"):
+        for _, ev in flat:
+            g = (ev.goal or "").lower()
+            if ("graph" in g or "state" in g) and (not ev.found):
+                return "Fact supremacy: required graph/state evidence missing."
+
+    return None
 
 
 def chief_justice(state: AgentState):
@@ -134,7 +163,6 @@ def chief_justice(state: AgentState):
         final_score, meta = _final_score_from_opinions(ops)
         scores = [int(o.score) for o in ops if o.score is not None]
 
-        # Build strengths/weaknesses
         strengths: List[str] = []
         weaknesses: List[str] = []
         for o in ops:
@@ -145,10 +173,8 @@ def chief_justice(state: AgentState):
                 weaknesses.append(f"{o.judge}: {txt[:180]}")
 
         dissent: Optional[str] = None
-        var = _variance(scores)
-
-        if var >= 2:
-            # ✅ satisfy dissent_requirement: explain prosecutor vs defense difference
+        if _variance(scores) >= 2:
+            # satisfy dissent_requirement (prosecutor vs defense)
             p = next((o for o in ops if o.judge == "Prosecutor"), None)
             de = next((o for o in ops if o.judge == "Defense"), None)
             if p and de:
@@ -157,9 +183,15 @@ def chief_justice(state: AgentState):
                     f"Defense scored {de.score}/5 emphasizing: {de.argument[:140]}."
                 )
             else:
-                dissent = "High disagreement between judges. Review evidence grounding and judge prompts."
-
+                dissent = "High disagreement between judges. Review evidence grounding."
             next_steps.append(f"Resolve dissent in {cid}: tighten evidence grounding & judge prompts.")
+
+        # Fact supremacy override (facts > opinions)
+        if str(rules.get("fact_supremacy", "")).strip():
+            penalty_reason = _fact_supremacy_penalty(cid, evidences)
+            if penalty_reason:
+                final_score = max(1, min(final_score, 2))
+                weaknesses.append(penalty_reason)
 
         if final_score <= 3:
             next_steps.append(f"Improve {cid}: add stronger citations + clearer cross-references (repo <-> report).")
@@ -173,7 +205,7 @@ def chief_justice(state: AgentState):
                 weaknesses=weaknesses[:3],
                 remediation=[
                     "Address judge weaknesses and add stronger evidence citations.",
-                    "Ensure report claims match repo implementation."
+                    "Ensure report claims match repo implementation.",
                 ],
                 dissent=dissent,
             )
@@ -181,20 +213,17 @@ def chief_justice(state: AgentState):
 
     overall = _compute_overall(results, weights)
 
-    # ✅ Apply synthesis_rules.security_override if confirmed
+    # Apply security override if confirmed (STRICT now)
     security_override = str(rules.get("security_override", "")).lower()
     if _security_flaw_confirmed(evidences):
         key_risks.append("Security red flag detected (unsafe system execution).")
-        next_steps.append("Fix unsafe system execution: remove os.system / shell=True, use safe subprocess calls.")
-
-        # If rule says "cap total score at 3", do that.
+        next_steps.append("Fix unsafe execution: remove os.system / shell=True, use safe subprocess calls.")
         if "cap" in security_override and "3" in security_override:
             overall = min(overall, 3)
         else:
-            # fallback: mild penalty
             overall = max(1, overall - 1)
 
-    # de-dup next_steps while preserving order
+    # de-dup next steps while preserving order
     seen = set()
     next_steps_unique: List[str] = []
     for s in next_steps:
@@ -216,56 +245,7 @@ def chief_justice(state: AgentState):
         next_steps=next_steps_unique[:8] if next_steps_unique else [
             "Review dissent areas (if any) and tighten evidence grounding.",
             "Add missing rubric coverage if any criterion has score=1.",
-            "Generate LangSmith trace link for submission proof.",
         ],
     )
-
-    # Write markdown output
-    os.makedirs("reports", exist_ok=True)
-    out_path = os.path.join("reports", "audit_report.md")
-
-    with open(out_path, "w", encoding="utf-8") as f:
-        f.write("# Automaton Auditor — Final Audit Report\n\n")
-        f.write(f"**Overall score:** {report.overall_score}/5\n\n")
-        f.write("## Executive Summary\n\n")
-        f.write(f"{report.executive_summary}\n\n")
-        f.write("## Criteria Results\n\n")
-
-        for cr in report.criteria:
-            f.write(f"### {cr.criterion_id} — {cr.final_score}/5\n\n")
-            f.write(f"{cr.summary}\n\n")
-
-            if cr.strengths:
-                f.write("**Strengths**\n")
-                for s in cr.strengths:
-                    f.write(f"- {s}\n")
-                f.write("\n")
-
-            if cr.weaknesses:
-                f.write("**Weaknesses**\n")
-                for w in cr.weaknesses:
-                    f.write(f"- {w}\n")
-                f.write("\n")
-
-            if cr.remediation:
-                f.write("**Remediation**\n")
-                for r in cr.remediation:
-                    f.write(f"- {r}\n")
-                f.write("\n")
-
-            if cr.dissent:
-                f.write(f"**Dissent:** {cr.dissent}\n\n")
-
-        if report.key_risks:
-            f.write("## Key Risks\n")
-            for k in report.key_risks:
-                f.write(f"- {k}\n")
-            f.write("\n")
-
-        if report.next_steps:
-            f.write("## Next Steps\n")
-            for n in report.next_steps:
-                f.write(f"- {n}\n")
-            f.write("\n")
 
     return {"final_report": report}

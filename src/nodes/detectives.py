@@ -16,15 +16,12 @@ def _clip(text: Optional[str], n: int = 240) -> Optional[str]:
     """Keep snippets short to avoid token bloat."""
     if not text:
         return text
-    text = " ".join(text.split())
+    text = " ".join(str(text).split())
     return text[:n] + ("..." if len(text) > n else "")
 
 
 def _best_per_concept(findings: List[Dict]) -> List[Dict]:
-    """
-    Deduplicate doc findings: keep the highest-confidence item per concept.
-    This prevents 'LangGraph found in chunk 3 and chunk 5' looking inconsistent.
-    """
+    """Keep highest-confidence item per concept."""
     best: Dict[str, Dict] = {}
     for f in findings:
         concept = str(f.get("concept", "")).strip()
@@ -49,50 +46,79 @@ def repo_investigator(state: AgentState):
             found=False,
             content=None,
             location="Remote Repo",
-            rationale="Repository cloning failed (authentication issue, invalid URL, or network error).",
+            rationale="Repository cloning failed (invalid URL, auth, or network).",
             confidence=0.0,
         )
-        return {"evidences": {"repo_detective": [fail_evidence]}}
+        return {
+            "evidences": {"repo_detective": [fail_evidence]},
+            "repo_failed": True,
+        }
 
     try:
         results = verify_graph_forensics(path)
         all_evidence: List[Evidence] = []
 
         # --- 1) Architecture Proof ---
-        parallel = bool(results.get("parallel"))
-        typed_state = bool(results.get("typed_state"))
+        graph_checks = results.get("graph_checks") or {}
+        state_checks = results.get("state_checks") or {}
+
+        # Backwards-compat (if older verifier output)
+        parallel = bool(results.get("parallel")) if "parallel" in results else bool(graph_checks.get("start_fanout"))
+        typed_state = bool(results.get("typed_state")) if "typed_state" in results else bool(state_checks.get("typed_state"))
         verified = bool(results.get("verified"))
         audited_file = results.get("file_audited", "src/graph.py + src/state.py")
         reason = str(results.get("reason", "N/A"))
 
-        # Optional extra fields (only if your verifier adds them)
-        start_fanout = results.get("start_fanout")
-        judge_fanout = results.get("judge_fanout")
-        reducers = results.get("reducers")
-
         content_lines = [
             f"verified={verified}",
-            f"parallel={parallel}",
-            f"typed_state={typed_state}",
+            f"parallel/fanout_ok={parallel}",
+            f"typed_state_ok={typed_state}",
         ]
-        if isinstance(start_fanout, list) and start_fanout:
-            content_lines.append(f"START fan-out -> {', '.join(start_fanout)}")
-        if isinstance(judge_fanout, list) and judge_fanout:
-            content_lines.append(f"Judges fan-out -> {', '.join(judge_fanout)}")
-        if isinstance(reducers, dict) and reducers:
-            content_lines.append(f"Reducers -> {reducers}")
+
+        # include richer checks if present
+        if graph_checks:
+            content_lines.append(f"graph_checks={graph_checks}")
+        if state_checks:
+            content_lines.append(f"state_checks={state_checks}")
 
         architecture_evidence = Evidence(
             goal="Repo Forensics: LangGraph fan-out/fan-in + Typed State reducers",
             found=verified,
-            content=_clip(" | ".join(content_lines), 320),
+            content=_clip(" | ".join(content_lines), 380),
             location=audited_file,
             rationale=_clip(f"AST verification summary: {reason}", 260) or "AST verification summary produced.",
             confidence=1.0 if verified else 0.65,
         )
         all_evidence.append(architecture_evidence)
 
-        # --- 2) Security Proof (improved wording to avoid false-trigger risks) ---
+        # --- 2) Git progression evidence (if available) ---
+        git_history = results.get("git_history") or []
+        if git_history:
+            sample = git_history[:5]
+            sample_text = "; ".join([f"{c.get('date','')} {c.get('message','')}" for c in sample])
+            all_evidence.append(
+                Evidence(
+                    goal="Git Forensics: Development progression",
+                    found=True,
+                    content=_clip(f"Commits={len(git_history)} | sample: {sample_text}", 360),
+                    location="git log --reverse",
+                    rationale="Commit history supports a plausible development story when messages show progression.",
+                    confidence=0.85,
+                )
+            )
+        else:
+            all_evidence.append(
+                Evidence(
+                    goal="Git Forensics: Development progression",
+                    found=False,
+                    content="No git history extracted (repo may be shallow, missing .git, or log failed).",
+                    location="git log --reverse",
+                    rationale="Unable to extract commit narrative; this can reduce forensic confidence.",
+                    confidence=0.5,
+                )
+            )
+
+        # --- 3) Security Proof (AST-based) ---
         unsafe_files = results.get("unsafe_files", []) or []
 
         if unsafe_files:
@@ -116,10 +142,15 @@ def repo_investigator(state: AgentState):
                 rationale="AST-based scan did not detect unsafe execution patterns in Python files.",
                 confidence=0.9,
             )
-
         all_evidence.append(security_evidence)
 
-        return {"evidences": {"repo_detective": all_evidence}}
+        # If core architecture verified is False, mark as repo_failed? (soft fail)
+        repo_failed = not bool(verified)
+
+        return {
+            "evidences": {"repo_detective": all_evidence},
+            "repo_failed": repo_failed,
+        }
 
     finally:
         if temp_dir:
@@ -127,27 +158,61 @@ def repo_investigator(state: AgentState):
 
 
 def doc_analyst(state: AgentState):
+    """
+    DocAnalyst:
+    - Chunk PDF (Docling)
+    - Search for rubric concepts (Dialectical Synthesis, Metacognition, LangGraph, etc.)
+    - Extract file-path claims and cross-reference against repo files (VERIFIED vs HALLUCINATED)
+    """
     interface = PDFForensicInterface(state["pdf_path"])
     all_evidence: List[Evidence] = []
 
-    if interface.ingest_and_chunk():
-        target_concepts = ["LangGraph", "Parallelism", "Reducers", "AST"]
-        findings = interface.targeted_search(target_concepts) or []
+    # For cross-reference, we need a repo clone (safe sandbox)
+    repo_path, repo_tmp = clone_repo_sandboxed(state["repo_url"])
 
-        if not findings:
+    try:
+        ok = interface.ingest_and_chunk()
+        if not ok:
+            all_evidence.append(
+                Evidence(
+                    goal="Documentation Ingestion Check",
+                    found=False,
+                    content=None,
+                    location=state["pdf_path"],
+                    rationale="PDF ingestion failed — document could not be parsed or loaded.",
+                    confidence=0.0,
+                )
+            )
+            return {"evidences": {"doc_detective": all_evidence}, "doc_failed": True}
+
+        # Required concepts per rubric text
+        target_concepts = [
+            "LangGraph",
+            "Parallelism",
+            "Reducers",
+            "ConditionalEdges",
+            "StateSync",
+            "DialecticalSynthesis",
+            "Metacognition",
+            "Swarm",
+            "Forensics",
+            "AST",
+        ]
+        findings = interface.targeted_search(target_concepts) or []
+        deduped = _best_per_concept(findings)
+
+        if not deduped:
             all_evidence.append(
                 Evidence(
                     goal="Documentation Theory Verification",
                     found=False,
-                    content=None,
+                    content="PDF ingested, but key rubric concepts were not detected with high confidence.",
                     location=state["pdf_path"],
-                    rationale="PDF ingestion succeeded, but no strong matches were found for key architectural concepts.",
+                    rationale="Missing theory keywords can weaken the forensic linkage between report and implementation.",
                     confidence=0.7,
                 )
             )
         else:
-            deduped = _best_per_concept(findings)
-
             for f in deduped:
                 concept = f.get("concept")
                 chunk_id = f.get("chunk_id")
@@ -159,44 +224,123 @@ def doc_analyst(state: AgentState):
                         found=True,
                         content=snippet,
                         location=f"Chunk {chunk_id}",
-                        rationale=f"Matched '{concept}' with high-confidence snippet from the report.",
+                        rationale=f"Matched '{concept}' with snippet from the report.",
                         confidence=float(f.get("confidence", 0.8)),
                     )
                 )
-    else:
-        all_evidence.append(
-            Evidence(
-                goal="Documentation Ingestion Check",
-                found=False,
-                content=None,
-                location=state["pdf_path"],
-                rationale="PDF ingestion failed — document could not be parsed or loaded.",
-                confidence=0.0,
-            )
-        )
 
-    return {"evidences": {"doc_detective": all_evidence}}
+        # Path claims cross-reference (hallucination check)
+        try:
+            path_claims = interface.cross_reference_paths(repo_path)  # uses repo_path if available
+        except Exception:
+            path_claims = []
+
+        if path_claims:
+            verified = [p for p in path_claims if p.get("status") == "VERIFIED"]
+            halluc = [p for p in path_claims if p.get("status") == "HALLUCINATED"]
+
+            all_evidence.append(
+                Evidence(
+                    goal="Doc Forensics: Path claims cross-reference",
+                    found=True,
+                    content=_clip(
+                        f"Verified={len(verified)} | Hallucinated={len(halluc)} | "
+                        f"examples_verified={', '.join([v['path'] for v in verified[:3]])} | "
+                        f"examples_hallucinated={', '.join([h['path'] for h in halluc[:3]])}",
+                        380,
+                    ),
+                    location="PDF report vs cloned repo",
+                    rationale="Cross-referencing file-path claims prevents report hallucination and supports forensic accuracy.",
+                    confidence=0.85,
+                )
+            )
+
+            if halluc:
+                all_evidence.append(
+                    Evidence(
+                        goal="Doc Forensics: Potential hallucinated file references",
+                        found=True,
+                        content=_clip("Hallucinated examples: " + ", ".join([h["path"] for h in halluc[:6]]), 360),
+                        location="PDF report",
+                        rationale="The report references file paths that do not exist in the repository.",
+                        confidence=0.9,
+                    )
+                )
+        else:
+            all_evidence.append(
+                Evidence(
+                    goal="Doc Forensics: Path claims cross-reference",
+                    found=False,
+                    content="No file-path claims detected in PDF text (or extraction unavailable).",
+                    location=state["pdf_path"],
+                    rationale="Path-claim extraction is optional but strengthens forensic accuracy when present.",
+                    confidence=0.5,
+                )
+            )
+
+        return {"evidences": {"doc_detective": all_evidence}, "doc_failed": False}
+
+    finally:
+        if repo_tmp:
+            repo_tmp.cleanup()
 
 
 def vision_inspector(state: AgentState):
     """
     VisionInspector:
+    - Attempts to extract embedded images/diagrams from the PDF (if PyMuPDF is available)
     - Clones the repo (sandboxed)
-    - Searches for common diagram/image files
-    - Produces Evidence about what visual artifacts exist
+    - Searches for common diagram/image files in repo
     """
-    path, temp_dir = clone_repo_sandboxed(state["repo_url"])
+    evidences: List[Evidence] = []
 
-    if not path:
-        fail_evidence = Evidence(
-            goal="Vision Inspection: Repo Access",
-            found=False,
-            content=None,
-            location="Remote Repo",
-            rationale="Could not clone repo, so images/diagrams could not be inspected.",
-            confidence=0.0,
+    # 1) PDF embedded images (best effort)
+    pdf_images_count: Optional[int] = None
+    try:
+        import fitz  # PyMuPDF  # type: ignore
+
+        doc = fitz.open(state["pdf_path"])
+        count = 0
+        for page in doc:
+            imgs = page.get_images(full=True)
+            count += len(imgs)
+        pdf_images_count = count
+        evidences.append(
+            Evidence(
+                goal="Vision Inspection: PDF embedded images/diagrams",
+                found=True,
+                content=f"Detected embedded images in PDF: {pdf_images_count}",
+                location=state["pdf_path"],
+                rationale="Counted embedded images via PyMuPDF. This supports diagram/figure inspection capability.",
+                confidence=0.85,
+            )
         )
-        return {"evidences": {"vision_inspector": [fail_evidence]}}
+    except Exception:
+        evidences.append(
+            Evidence(
+                goal="Vision Inspection: PDF embedded images/diagrams",
+                found=False,
+                content="PyMuPDF not available or PDF could not be scanned for embedded images.",
+                location=state["pdf_path"],
+                rationale="Implementation exists as best-effort; environment may lack dependency.",
+                confidence=0.5,
+            )
+        )
+
+    # 2) Repo images scan
+    path, temp_dir = clone_repo_sandboxed(state["repo_url"])
+    if not path:
+        evidences.append(
+            Evidence(
+                goal="Vision Inspection: Repo Access",
+                found=False,
+                content=None,
+                location="Remote Repo",
+                rationale="Could not clone repo, so repo images/diagrams could not be inspected.",
+                confidence=0.0,
+            )
+        )
+        return {"evidences": {"vision_inspector": evidences}, "vision_failed": True}
 
     try:
         image_exts = {".png", ".jpg", ".jpeg", ".webp", ".svg"}
@@ -216,12 +360,10 @@ def vision_inspector(state: AgentState):
                 if ext in image_exts:
                     found_images.append(os.path.join(root, fname))
 
-        evidences: List[Evidence] = []
-
         if not found_images:
             evidences.append(
                 Evidence(
-                    goal="Vision Inspection: Architecture Diagrams",
+                    goal="Vision Inspection: Repo diagrams/images",
                     found=False,
                     content="No image/diagram files found in the repository.",
                     location="Repository Scan",
@@ -231,7 +373,6 @@ def vision_inspector(state: AgentState):
             )
         else:
             sample = found_images[:6]
-
             for img_path in sample:
                 rel = os.path.relpath(img_path, path)
                 dims = None
@@ -251,7 +392,7 @@ def vision_inspector(state: AgentState):
                     Evidence(
                         goal="Vision Proof: Diagram/Image Artifact",
                         found=True,
-                        content=_clip(content, 280),
+                        content=_clip(content, 300),
                         location=rel,
                         rationale="Repository contains visual artifacts that may document architecture or flows.",
                         confidence=0.9,
@@ -260,16 +401,16 @@ def vision_inspector(state: AgentState):
 
             evidences.append(
                 Evidence(
-                    goal="Vision Summary: Visual Artifacts Count",
+                    goal="Vision Summary: Repo visual artifacts count",
                     found=True,
-                    content=f"Total images/diagrams found: {len(found_images)}",
+                    content=f"Total images/diagrams found in repo: {len(found_images)}",
                     location="Repository Scan",
                     rationale="Counted all matching image file extensions in the repo.",
                     confidence=0.9,
                 )
             )
 
-        return {"evidences": {"vision_inspector": evidences}}
+        return {"evidences": {"vision_inspector": evidences}, "vision_failed": False}
 
     finally:
         if temp_dir:
