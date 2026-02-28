@@ -55,8 +55,24 @@ def repo_investigator(state: AgentState):
         }
 
     try:
-        results = verify_graph_forensics(path)
         all_evidence: List[Evidence] = []
+
+        # ✅ If verify_graph_forensics crashes, THAT is a failure
+        try:
+            results = verify_graph_forensics(path)
+        except Exception as e:
+            crash_evidence = Evidence(
+                goal="Repo Forensics: Verifier crashed",
+                found=False,
+                content=_clip(str(e), 300),
+                location="verify_graph_forensics",
+                rationale="Repo was cloned, but verification tool crashed.",
+                confidence=0.0,
+            )
+            return {
+                "evidences": {"repo_detective": [crash_evidence]},
+                "repo_failed": True,
+            }
 
         # --- 1) Architecture Proof ---
         graph_checks = results.get("graph_checks") or {}
@@ -83,7 +99,7 @@ def repo_investigator(state: AgentState):
 
         architecture_evidence = Evidence(
             goal="Repo Forensics: LangGraph fan-out/fan-in + Typed State reducers",
-            found=verified,
+            found=verified,  # ✅ this can be False, that's OK (not a node failure)
             content=_clip(" | ".join(content_lines), 380),
             location=audited_file,
             rationale=_clip(f"AST verification summary: {reason}", 260) or "AST verification summary produced.",
@@ -144,12 +160,12 @@ def repo_investigator(state: AgentState):
             )
         all_evidence.append(security_evidence)
 
-        # If core architecture verified is False, mark as repo_failed? (soft fail)
-        repo_failed = not bool(verified)
-
+        # ✅ IMPORTANT FIX:
+        # Repo detective ran successfully -> repo_failed must be False
+        # Even if verified=False, that's just "evidence found=False", not a failure.
         return {
             "evidences": {"repo_detective": all_evidence},
-            "repo_failed": repo_failed,
+            "repo_failed": False,
         }
 
     finally:
@@ -161,13 +177,12 @@ def doc_analyst(state: AgentState):
     """
     DocAnalyst:
     - Chunk PDF (Docling)
-    - Search for rubric concepts (Dialectical Synthesis, Metacognition, LangGraph, etc.)
-    - Extract file-path claims and cross-reference against repo files (VERIFIED vs HALLUCINATED)
+    - Search for rubric concepts
+    - Extract file-path claims and cross-reference against repo files
     """
     interface = PDFForensicInterface(state["pdf_path"])
     all_evidence: List[Evidence] = []
 
-    # For cross-reference, we need a repo clone (safe sandbox)
     repo_path, repo_tmp = clone_repo_sandboxed(state["repo_url"])
 
     try:
@@ -185,7 +200,6 @@ def doc_analyst(state: AgentState):
             )
             return {"evidences": {"doc_detective": all_evidence}, "doc_failed": True}
 
-        # Required concepts per rubric text
         target_concepts = [
             "LangGraph",
             "Parallelism",
@@ -231,7 +245,7 @@ def doc_analyst(state: AgentState):
 
         # Path claims cross-reference (hallucination check)
         try:
-            path_claims = interface.cross_reference_paths(repo_path)  # uses repo_path if available
+            path_claims = interface.cross_reference_paths(repo_path)
         except Exception:
             path_claims = []
 
@@ -288,14 +302,12 @@ def doc_analyst(state: AgentState):
 def vision_inspector(state: AgentState):
     """
     VisionInspector:
-    - Attempts to extract embedded images/diagrams from the PDF (if PyMuPDF is available)
-    - Clones the repo (sandboxed)
-    - Searches for common diagram/image files in repo
+    - Attempts to count embedded images/diagrams in the PDF
+    - Clones the repo and searches for diagram/image files
     """
     evidences: List[Evidence] = []
 
     # 1) PDF embedded images (best effort)
-    pdf_images_count: Optional[int] = None
     try:
         import fitz  # PyMuPDF  # type: ignore
 
@@ -304,14 +316,14 @@ def vision_inspector(state: AgentState):
         for page in doc:
             imgs = page.get_images(full=True)
             count += len(imgs)
-        pdf_images_count = count
+
         evidences.append(
             Evidence(
                 goal="Vision Inspection: PDF embedded images/diagrams",
                 found=True,
-                content=f"Detected embedded images in PDF: {pdf_images_count}",
+                content=f"Detected embedded images in PDF: {count}",
                 location=state["pdf_path"],
-                rationale="Counted embedded images via PyMuPDF. This supports diagram/figure inspection capability.",
+                rationale="Counted embedded images via PyMuPDF.",
                 confidence=0.85,
             )
         )
@@ -322,7 +334,7 @@ def vision_inspector(state: AgentState):
                 found=False,
                 content="PyMuPDF not available or PDF could not be scanned for embedded images.",
                 location=state["pdf_path"],
-                rationale="Implementation exists as best-effort; environment may lack dependency.",
+                rationale="Best-effort feature; dependency may be missing.",
                 confidence=0.5,
             )
         )
@@ -346,7 +358,6 @@ def vision_inspector(state: AgentState):
         image_exts = {".png", ".jpg", ".jpeg", ".webp", ".svg"}
         found_images: List[str] = []
 
-        # Optional: attempt to read image dimensions if Pillow exists
         try:
             from PIL import Image  # type: ignore
             pil_ok = True
@@ -405,7 +416,7 @@ def vision_inspector(state: AgentState):
                     found=True,
                     content=f"Total images/diagrams found in repo: {len(found_images)}",
                     location="Repository Scan",
-                    rationale="Counted all matching image file extensions in the repo.",
+                    rationale="Counted image file extensions in the repo.",
                     confidence=0.9,
                 )
             )
