@@ -1,29 +1,86 @@
 {
-  "criteria": [
+  "rubric_metadata": {
+    "rubric_name": "Week 2: The Automaton Auditor Self-Evaluation",
+    "grading_target": "Week 2 Auditor Repository & Architectural Report",
+    "version": "3.0.0"
+  },
+  "dimensions": [
     {
-      "id": "forensic_accuracy",
-      "name": "Forensic Accuracy",
-      "description": "Evidence is grounded, cross-references repo + report, avoids hallucination, and cites sources clearly."
+      "id": "git_forensic_analysis",
+      "name": "Git Forensic Analysis",
+      "target_artifact": "github_repo",
+      "forensic_instruction": "Run 'git log --oneline --reverse' on the\ncloned repository. Count the total number of commits. Check if the commit\nhistory tells a plausible \"development story\" (e.g. initial setup -> detective\nimplementation -> judge prompts -> synthesis -> reporting). Verify that there are\nmeaningful commit messages (not all 'update' or 'fix').",
+      "judicial_logic": {
+        "prosecutor": "If there are fewer than 4 commits, charge with\n'Development Negligence'. If commit messages are meaningless, score max 2.",
+        "defense": "A short commit history can be acceptable if the\ncommits are meaningful and show iteration.",
+        "tech_lead": "Reward commit history that clearly maps to the\nsystem architecture build-out."
+      },
+      "failure_pattern": "Single commit dumps the entire solution or commit history does not show progression."
     },
     {
-      "id": "graph_architecture",
-      "name": "Graph Architecture",
-      "description": "Clear LangGraph fan-out/fan-in structure, reducers, typed state, and correct orchestration."
+      "id": "security_sandboxing",
+      "name": "Security & Sandboxing (Repo Tools)",
+      "target_artifact": "github_repo",
+      "forensic_instruction": "Inspect repo cloning and file-system tooling.\nVerify repo cloning is done in a temp sandbox directory (e.g. tempfile.TemporaryDirectory).\nCheck that subprocess calls do NOT use shell=True and avoid os.system.\nConfirm errors are handled (check=True + try/except).",
+      "judicial_logic": {
+        "prosecutor": "If os.system is used, charge with 'Security\nNegligence'. If shell=True appears, charge with 'Shell Injection Risk'.",
+        "defense": "Give partial credit if sandboxing exists but needs\nsmall hardening.",
+        "tech_lead": "Prefer safe subprocess.run([...], check=True) and\nexplicit allowlists."
+      },
+      "failure_pattern": "Unsafe shell execution or no sandboxing."
+    },
+    {
+      "id": "forensic_accuracy_code",
+      "name": "Forensic Accuracy (Codebase)",
+      "target_artifact": "github_repo",
+      "forensic_instruction": "Trace the repository for production-grade\nengineering. Verify Pydantic State models in 'src/graph.py' or\n'src/state.py'. Check 'src/tools/' for sandboxed 'git clone' operations.",
+      "judicial_logic": {
+        "prosecutor": "If tool execution relies on raw 'os.system' without\nerror handling or sandboxing, charge with 'Security Negligence'. If Pydantic\nis missing entirely, score max 2.",
+        "defense": "Highlight any creative use of AST parsing to read\nLangGraph node definitions despite environment constraints.",
+        "tech_lead": "Assess the state reducers. Are 'operator.add' or\n'operator.ior' used correctly to prevent data loss during parallel\nexecution?"
+      },
+      "failure_pattern": "Claims of features not supported by repository evidence."
+    },
+    {
+      "id": "forensic_accuracy_docs",
+      "name": "Forensic Accuracy (Documentation)",
+      "target_artifact": "pdf_report",
+      "forensic_instruction": "Scan PDF for theoretical depth. Verify\nmentions of 'Dialectical Synthesis' and 'Metacognition'. Cross-reference\nclaims made in the PDF (e.g., 'We implemented parallel Judges') with the\nevidence found by the Code Detective.",
+      "judicial_logic": {
+        "prosecutor": "If the report claims features that are not present in\nthe code, charge with 'Auditor Hallucination'. Score 1.",
+        "defense": "Identify sections where the trainee demonstrates deep\nalignment with Multi-Agent System theories.",
+        "tech_lead": "Verify if the architectural notes provide enough\ndetail for a third party to recreate the swarm."
+      },
+      "failure_pattern": "Report claims are not verifiable in repo."
     },
     {
       "id": "judicial_nuance",
-      "name": "Judicial Nuance",
-      "description": "Distinct judge personas, evidence-grounded disagreement, and a clear synthesis process."
+      "name": "Judicial Nuance & Dialectics",
+      "target_artifact": "github_repo",
+      "forensic_instruction": "Scan 'src/nodes/' or prompt templates. Verify\nthat Prosecutor, Defense, and Tech Lead personas have distinct, conflicting\nsystem prompts. Check if the graph forces structured JSON output.",
+      "judicial_logic": {
+        "prosecutor": "If the three judges share 90% of the same prompt\ntext, charge with 'Persona Collusion'. Score max 2. If outputs are free\ntext, charge with 'Hallucination Liability'.",
+        "defense": "Look for specific prompt instructions that force the\nmodel to be 'contrarian' or 'forgiving'.",
+        "tech_lead": "Evaluate if the judges successfully map their opinions\nback to specific rubric criteria IDs."
+      },
+      "failure_pattern": "Judges produce similar text or unstructured output."
     },
     {
-      "id": "ai_usage_judgment",
-      "name": "AI Usage & Judgment",
-      "description": "Uses LLMs correctly for judgment, structured output, and separates reasoning from facts."
-    },
-    {
-      "id": "quality_of_execution",
-      "name": "Quality of Execution",
-      "description": "Runnable, readable, secure, and production-quality patterns (errors handled, no unsafe calls)."
+      "id": "langgraph_architecture",
+      "name": "LangGraph Orchestration Rigor",
+      "target_artifact": "github_repo",
+      "forensic_instruction": "Analyze the StateGraph definition. Verify the\nuse of parallel branches (fan-out) for Judges and Detectives. Check for\nconditional edges that handle 'Evidence Missing' or 'Node Failure'\nscenarios.",
+      "judicial_logic": {
+        "prosecutor": "If the graph is purely linear (A->B->C), charge with\n'Orchestration Fraud'. Score 1.",
+        "defense": "Support simpler graph designs if they implement robust\n'State' transitions and Pydantic validation at every node.",
+        "tech_lead": "Determine if the fan-in synchronization correctly\naggregates lists of evidence before passing them to the judicial bench."
+      },
+      "failure_pattern": "No fan-out/fan-in or brittle orchestration."
     }
-  ]
+  ],
+  "synthesis_rules": {
+    "security_override": "Confirmed security flaws (e.g., shell injection in\ngit tools) cap total score at 3.",
+    "fact_supremacy": "Forensic evidence (facts) always overrules Judicial\nopinion (interpretation).",
+    "dissent_requirement": "The Chief Justice must summarize why the\nProsecutor and Defense disagreed in the final report."
+  }
 }

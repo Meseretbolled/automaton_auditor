@@ -1,7 +1,7 @@
 from langgraph.graph import StateGraph, START, END
 
 from src.state import AgentState
-from src.nodes.detectives import repo_investigator, doc_analyst
+from src.nodes.detectives import repo_investigator, doc_analyst, vision_inspector
 from src.nodes.judges import prosecutor_judge, defense_judge, techlead_judge
 from src.nodes.justice import chief_justice
 
@@ -30,15 +30,18 @@ builder = StateGraph(AgentState)
 # -----------------------------
 builder.add_node("repo_detective", repo_investigator)
 builder.add_node("doc_detective", doc_analyst)
+builder.add_node("vision_inspector", vision_inspector)
 builder.add_node("evidence_aggregator", evidence_aggregator)
 
 # Fan-out
 builder.add_edge(START, "repo_detective")
 builder.add_edge(START, "doc_detective")
+builder.add_edge(START, "vision_inspector")
 
 # Fan-in
 builder.add_edge("repo_detective", "evidence_aggregator")
 builder.add_edge("doc_detective", "evidence_aggregator")
+builder.add_edge("vision_inspector", "evidence_aggregator")
 
 # -----------------------------
 # Judges
