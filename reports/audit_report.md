@@ -1,93 +1,100 @@
 # Automaton Auditor — Final Audit Report
 
-**Overall score:** 2/5
+**Overall score:** 3/5
 
 ## Executive Summary
 
-Final audit complete. Overall score=2/5. Criteria evaluated=5. Judicial opinions received=15.
+Final audit complete. Overall score=3/5. Criteria evaluated=6. Judicial opinions received=18.
 
 ## Criteria Results
 
-### forensic_accuracy — 2/5
+### git_forensic_analysis — 3/5
 
-Chief Justice synthesis (avg=3.00, var=2).
+Chief Justice synthesis (avg=3.33, var=1).
 
 **Strengths**
-- TechLead: Strong evidence is provided from both doc_detective and repo_detective, citing specific sources and chunks. However, the
-
-**Weaknesses**
-- Prosecutor: The evidence provided is weak due to the lack of cross-references between the repo and report. While there are some find
+- TechLead: The commit history shows a plausible development story with meaningful commit messages. The presence of 'detective implementation' and 'judge prompts' suggests a well-structured pr
 
 **Remediation**
 - Address judge weaknesses and add stronger evidence citations.
 - Ensure report claims match repo implementation.
 
-**Dissent:** High disagreement between judges. Review evidence grounding and judge prompts.
+### security_sandboxing — 4/5
 
-### graph_architecture — 2/5
+Chief Justice synthesis (avg=4.00, var=2).
+
+**Strengths**
+- Prosecutor: Based on the provided evidence, repo cloning is done in a temp sandbox directory, and subprocess calls do not use shell=True. Errors are handled with check=True and try/except. The
+- TechLead: The code demonstrates a strong understanding of security and sandboxing principles by using tempfile.TemporaryDirectory for repo cloning and avoiding shell=True in subprocess calls
+
+**Remediation**
+- Address judge weaknesses and add stronger evidence citations.
+- Ensure report claims match repo implementation.
+
+**Dissent:** Prosecutor scored 5/5 emphasizing: Based on the provided evidence, repo cloning is done in a temp sandbox directory, and subprocess calls do not use shell=True. Errors are han. Defense scored 3/5 emphasizing: The code demonstrates a clear intent to use a temp sandbox directory for repo cloning, which is a good practice. However, it is not clear if.
+
+### forensic_accuracy_code — 4/5
+
+Chief Justice synthesis (avg=4.00, var=2).
+
+**Strengths**
+- Defense: The codebase demonstrates strong forensic accuracy, with evidence of thorough analysis of the repository. The use of AST parsing to read LangGraph node definitions is a creative ap
+- TechLead: The codebase demonstrates excellent forensic accuracy, as evidenced by the successful application of Doc Detective and Repo Detective tools. Doc Detective found strong evidence of 
+
+**Remediation**
+- Address judge weaknesses and add stronger evidence citations.
+- Ensure report claims match repo implementation.
+
+**Dissent:** Prosecutor scored 3/5 emphasizing: Rate limit hit. Used deterministic fallback for this criterion.. Defense scored 4/5 emphasizing: The codebase demonstrates strong forensic accuracy, with evidence of thorough analysis of the repository. The use of AST parsing to read Lan.
+
+### forensic_accuracy_docs — 3/5
+
+Chief Justice synthesis (avg=3.33, var=1).
+
+**Strengths**
+- TechLead: The PDF demonstrates strong forensic accuracy through thorough documentation of theoretical depth. The mention of 'Dialectical Synthesis' and 'Metacognition' is supported by eviden
+
+**Remediation**
+- Address judge weaknesses and add stronger evidence citations.
+- Ensure report claims match repo implementation.
+
+### judicial_nuance — 2/5
 
 Chief Justice synthesis (avg=2.67, var=3).
 
 **Strengths**
-- TechLead: The code demonstrates a clear LangGraph fan-out/fan-in structure, reducers, and typed state, which aligns with the expec
+- Defense: The evidence suggests that the system has implemented distinct, conflicting system prompts for Prosecutor, Defense, and Tech Lead personas. The presence of AST, LangGraph, Parallel
 
 **Weaknesses**
-- Prosecutor: The submission fails to meet the requirements due to missing evidence for key components such as correct orchestration a
+- Prosecutor: Lack of evidence on distinct prompts for Prosecutor, Defense, and Tech Lead personas. Graph forcing structured JSON output is not verified. Therefore, I charge with 'Insufficient E
 
 **Remediation**
 - Address judge weaknesses and add stronger evidence citations.
 - Ensure report claims match repo implementation.
 
-**Dissent:** High disagreement between judges. Review evidence grounding and judge prompts.
+**Dissent:** Prosecutor scored 1/5 emphasizing: Lack of evidence on distinct prompts for Prosecutor, Defense, and Tech Lead personas. Graph forcing structured JSON output is not verified. . Defense scored 4/5 emphasizing: The evidence suggests that the system has implemented distinct, conflicting system prompts for Prosecutor, Defense, and Tech Lead personas. .
 
-### judicial_nuance — 1/5
+### langgraph_architecture — 3/5
 
-Chief Justice synthesis (avg=1.67, var=2).
-
-**Weaknesses**
-- Prosecutor: The submission fails to demonstrate distinct judge personas, evidence-grounded disagreement, and a clear synthesis proce
-- TechLead: The provided evidence does not demonstrate distinct judge personas, evidence-grounded disagreement, and a clear synthesi
-
-**Remediation**
-- Address judge weaknesses and add stronger evidence citations.
-- Ensure report claims match repo implementation.
-
-**Dissent:** High disagreement between judges. Review evidence grounding and judge prompts.
-
-### ai_usage_judgment — 1/5
-
-Chief Justice synthesis (avg=2.33, var=2).
-
-**Weaknesses**
-- Prosecutor: The evidence provided does not demonstrate the correct usage of LLMs for judgment, structured output, and separating rea
-
-**Remediation**
-- Address judge weaknesses and add stronger evidence citations.
-- Ensure report claims match repo implementation.
-
-**Dissent:** High disagreement between judges. Review evidence grounding and judge prompts.
-
-### quality_of_execution — 2/5
-
-Chief Justice synthesis (avg=3.00, var=2).
+Chief Justice synthesis (avg=3.33, var=1).
 
 **Strengths**
-- TechLead: The codebase demonstrates strong evidence of quality execution, with multiple instances of secure and production-quality
-
-**Weaknesses**
-- Prosecutor: The code fails to meet the security requirements due to the presence of unsafe system calls. Additionally, there is no e
+- Defense: Rate limit hit. Used deterministic fallback for this criterion.
 
 **Remediation**
 - Address judge weaknesses and add stronger evidence citations.
 - Ensure report claims match repo implementation.
-
-**Dissent:** High disagreement between judges. Review evidence grounding and judge prompts.
 
 ## Key Risks
 - Security red flag detected (unsafe system execution).
 
 ## Next Steps
-- Review dissent areas (if any) and tighten evidence grounding.
-- Add missing rubric coverage if any criterion has score=1.
-- Generate LangSmith trace link for submission proof.
+- Improve git_forensic_analysis: add stronger citations + clearer cross-references (repo <-> report).
+- Resolve dissent in security_sandboxing: tighten evidence grounding & judge prompts.
+- Resolve dissent in forensic_accuracy_code: tighten evidence grounding & judge prompts.
+- Improve forensic_accuracy_docs: add stronger citations + clearer cross-references (repo <-> report).
+- Resolve dissent in judicial_nuance: tighten evidence grounding & judge prompts.
+- Improve judicial_nuance: add stronger citations + clearer cross-references (repo <-> report).
+- Improve langgraph_architecture: add stronger citations + clearer cross-references (repo <-> report).
+- Fix unsafe system execution: remove os.system / shell=True, use safe subprocess calls.
 
