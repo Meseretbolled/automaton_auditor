@@ -1,0 +1,101 @@
+{
+  "overall_score": 3,
+  "executive_summary": "Final audit complete. Overall score=3/5. Criteria evaluated=6. Judicial opinions received=18.",
+  "criteria": [
+    {
+      "criterion_id": "git_forensic_analysis",
+      "final_score": 3,
+      "summary": "Chief Justice synthesis (avg=2.67, var=1).",
+      "strengths": [],
+      "weaknesses": [
+        "Prosecutor: LLM disabled/unavailable. Used deterministic fallback."
+      ],
+      "remediation": [
+        "Address judge weaknesses and add stronger evidence citations.",
+        "Ensure report claims match repo implementation."
+      ],
+      "dissent": null
+    },
+    {
+      "criterion_id": "security_sandboxing",
+      "final_score": 3,
+      "summary": "Chief Justice synthesis (avg=2.67, var=1).",
+      "strengths": [],
+      "weaknesses": [
+        "Prosecutor: LLM disabled/unavailable. Used deterministic fallback."
+      ],
+      "remediation": [
+        "Address judge weaknesses and add stronger evidence citations.",
+        "Ensure report claims match repo implementation."
+      ],
+      "dissent": null
+    },
+    {
+      "criterion_id": "forensic_accuracy_code",
+      "final_score": 2,
+      "summary": "Chief Justice synthesis (avg=2.67, var=1).",
+      "strengths": [],
+      "weaknesses": [
+        "Prosecutor: LLM disabled/unavailable. Used deterministic fallback.",
+        "Fact supremacy: required graph/state evidence missing."
+      ],
+      "remediation": [
+        "Address judge weaknesses and add stronger evidence citations.",
+        "Ensure report claims match repo implementation."
+      ],
+      "dissent": null
+    },
+    {
+      "criterion_id": "forensic_accuracy_docs",
+      "final_score": 3,
+      "summary": "Chief Justice synthesis (avg=2.67, var=1).",
+      "strengths": [],
+      "weaknesses": [
+        "Prosecutor: LLM disabled/unavailable. Used deterministic fallback."
+      ],
+      "remediation": [
+        "Address judge weaknesses and add stronger evidence citations.",
+        "Ensure report claims match repo implementation."
+      ],
+      "dissent": null
+    },
+    {
+      "criterion_id": "judicial_nuance",
+      "final_score": 3,
+      "summary": "Chief Justice synthesis (avg=2.67, var=1).",
+      "strengths": [],
+      "weaknesses": [
+        "Prosecutor: LLM disabled/unavailable. Used deterministic fallback."
+      ],
+      "remediation": [
+        "Address judge weaknesses and add stronger evidence citations.",
+        "Ensure report claims match repo implementation."
+      ],
+      "dissent": null
+    },
+    {
+      "criterion_id": "langgraph_architecture",
+      "final_score": 2,
+      "summary": "Chief Justice synthesis (avg=2.67, var=1).",
+      "strengths": [],
+      "weaknesses": [
+        "Prosecutor: LLM disabled/unavailable. Used deterministic fallback.",
+        "Fact supremacy: required graph/state evidence missing."
+      ],
+      "remediation": [
+        "Address judge weaknesses and add stronger evidence citations.",
+        "Ensure report claims match repo implementation."
+      ],
+      "dissent": null
+    }
+  ],
+  "key_risks": [],
+  "next_steps": [
+    "Improve git_forensic_analysis: add stronger citations + clearer cross-references (repo <-> report).",
+    "Improve security_sandboxing: add stronger citations + clearer cross-references (repo <-> report).",
+    "Improve forensic_accuracy_code: add stronger citations + clearer cross-references (repo <-> report).",
+    "Improve forensic_accuracy_docs: add stronger citations + clearer cross-references (repo <-> report).",
+    "Improve judicial_nuance: add stronger citations + clearer cross-references (repo <-> report).",
+    "Improve langgraph_architecture: add stronger citations + clearer cross-references (repo <-> report)."
+  ]
+}
