@@ -4,11 +4,6 @@ from typing import Annotated, Dict, List, Optional, Literal, Any
 from pydantic import BaseModel, Field
 from typing_extensions import TypedDict
 
-
-# =========================================================
-# 🔎 Detective Output
-# =========================================================
-
 class Evidence(BaseModel):
     goal: str
     found: bool
@@ -17,10 +12,6 @@ class Evidence(BaseModel):
     rationale: str
     confidence: float = Field(ge=0.0, le=1.0)
 
-
-# =========================================================
-# ⚖️ Judicial Output (Per-criterion)
-# =========================================================
 
 JudgeName = Literal["Prosecutor", "Defense", "TechLead"]
 
@@ -32,10 +23,6 @@ class JudicialOpinion(BaseModel):
     argument: str
     cited_evidence: List[str] = Field(default_factory=list)
 
-
-# =========================================================
-# 👑 Final Report (Chief Justice Output)
-# =========================================================
 
 class CriterionResult(BaseModel):
     criterion_id: str
@@ -54,10 +41,6 @@ class AuditReport(BaseModel):
     key_risks: List[str] = Field(default_factory=list)
     next_steps: List[str] = Field(default_factory=list)
 
-
-# =========================================================
-# 🧩 Reducers (to prevent data loss during parallel execution)
-# =========================================================
 
 def merge_evidence_dict(
     left: Dict[str, List[Evidence]] | None,
@@ -85,10 +68,6 @@ def last_write_wins(left: Any, right: Any) -> Any:
     """Reducer for single final values (e.g., final_report)."""
     return right if right is not None else left
 
-
-# =========================================================
-# 🧠 LangGraph State
-# =========================================================
 
 class AgentState(TypedDict, total=False):
     repo_url: str

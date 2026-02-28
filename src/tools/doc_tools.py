@@ -73,8 +73,6 @@ class PDFForensicInterface:
                     })
 
         return evidence_found
-
-
 def ingest_pdf_simple(path: str) -> str:
     """Quick helper for legacy components."""
     interface = PDFForensicInterface(path)
